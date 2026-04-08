@@ -19,3 +19,7 @@ node_modules/
 dist/
 build/
 coverage/
+
+# Python cache
+__pycache__/
+*.py[cod]
