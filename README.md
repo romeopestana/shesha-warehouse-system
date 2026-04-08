@@ -20,8 +20,9 @@ FastAPI + PostgreSQL starter for the Shesha Warehouse System project.
    - `copy .env.example .env`
 4. Start PostgreSQL:
    - `docker compose up -d`
+   - This project uses host port `5433` to avoid conflicts with other local Postgres services.
 5. Run API:
-   - `uvicorn app.main:app --reload`
+   - `uvicorn app.main:app --reload --port 8010`
 
 ## Authentication
 
@@ -45,4 +46,4 @@ FastAPI + PostgreSQL starter for the Shesha Warehouse System project.
 - `POST /stock-movements` (`IN` or `OUT`)
 - `GET /stock-movements`
 
-Interactive docs are available at `http://127.0.0.1:8000/docs`.
+Interactive docs are available at `http://127.0.0.1:8010/docs`.

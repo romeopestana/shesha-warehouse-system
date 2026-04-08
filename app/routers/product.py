@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Product, Warehouse
+from app.models import InventoryLot, Product, Warehouse
 from app.schemas import ProductCreate, ProductOut
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -10,6 +10,9 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 @router.post("", response_model=ProductOut)
 def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
+    # Ensure the FIFO lot table exists even without migration tooling.
+    InventoryLot.__table__.create(bind=db.get_bind(), checkfirst=True)
+
     warehouse = db.query(Warehouse).filter(Warehouse.id == payload.warehouse_id).first()
     if not warehouse:
         raise HTTPException(status_code=404, detail="Warehouse not found")
@@ -25,6 +28,16 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
         quantity_on_hand=payload.quantity_on_hand,
     )
     db.add(product)
+    db.flush()
+
+    if payload.quantity_on_hand > 0:
+        db.add(
+            InventoryLot(
+                product_id=product.id,
+                quantity_remaining=payload.quantity_on_hand,
+            )
+        )
+
     db.commit()
     db.refresh(product)
     return product

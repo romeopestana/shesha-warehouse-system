@@ -29,6 +29,18 @@ class Product(Base):
 
     warehouse: Mapped["Warehouse"] = relationship(back_populates="products")
     stock_movements: Mapped[list["StockMovement"]] = relationship(back_populates="product")
+    inventory_lots: Mapped[list["InventoryLot"]] = relationship(back_populates="product")
+
+
+class InventoryLot(Base):
+    __tablename__ = "inventory_lots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
+    quantity_remaining: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    product: Mapped["Product"] = relationship(back_populates="inventory_lots")
 
 
 class StockMovement(Base):
