@@ -20,8 +20,21 @@ FastAPI + PostgreSQL starter for the Shesha Warehouse System project.
    - `copy .env.example .env`
 4. Start PostgreSQL:
    - `docker compose up -d`
-5. Run API:
+   - Postgres is exposed on host port `5433`
+5. Run migrations:
+   - `alembic upgrade head`
+6. Run API:
    - `uvicorn app.main:app --reload`
+
+## Seed Data
+
+Run:
+
+- `python scripts/seed.py`
+
+This inserts:
+- warehouse: `Main Warehouse`
+- product: `SKU-1001` with quantity `100`
 
 ## API Endpoints
 
