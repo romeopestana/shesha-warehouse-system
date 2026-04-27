@@ -50,3 +50,12 @@ FastAPI + PostgreSQL starter for the Shesha Warehouse System project.
 - `GET /stock-movements` (supports `product_id`, `date_from`, `date_to` filters)
 
 Interactive docs are available at `http://127.0.0.1:8010/docs`.
+
+## Automated Tests
+
+- Run tests locally:
+  - `pytest -q`
+- CI runs on pull requests and `main` pushes:
+  - applies migrations
+  - seeds admin user
+  - executes API tests (auth, roles, FIFO, and audit filters)
