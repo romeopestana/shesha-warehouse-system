@@ -51,6 +51,7 @@ class StockMovement(Base):
     movement_type: Mapped[str] = mapped_column(String(10), nullable=False)  # IN or OUT
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     note: Mapped[str] = mapped_column(String(255), default="")
+    performed_by: Mapped[str] = mapped_column(String(120), default="system")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     product: Mapped["Product"] = relationship(back_populates="stock_movements")
