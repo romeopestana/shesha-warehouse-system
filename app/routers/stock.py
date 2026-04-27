@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.auth import User, require_roles
@@ -66,6 +68,7 @@ def create_stock_movement(
         movement_type=payload.movement_type,
         quantity=payload.quantity,
         note=payload.note,
+        performed_by=_.username,
     )
     db.add(movement)
     db.add(product)
@@ -78,5 +81,17 @@ def create_stock_movement(
 def list_stock_movements(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin", "clerk")),
+    product_id: int | None = Query(default=None),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
 ):
-    return db.query(StockMovement).order_by(StockMovement.id.desc()).all()
+    query = db.query(StockMovement)
+
+    if product_id is not None:
+        query = query.filter(StockMovement.product_id == product_id)
+    if date_from is not None:
+        query = query.filter(StockMovement.created_at >= date_from)
+    if date_to is not None:
+        query = query.filter(StockMovement.created_at <= date_to)
+
+    return query.order_by(StockMovement.id.desc()).all()

@@ -45,7 +45,8 @@ FastAPI + PostgreSQL starter for the Shesha Warehouse System project.
 - `GET /warehouses`
 - `POST /products`
 - `GET /products`
+- `GET /products/{product_id}/lots`
 - `POST /stock-movements` (`IN` or `OUT`)
-- `GET /stock-movements`
+- `GET /stock-movements` (supports `product_id`, `date_from`, `date_to` filters)
 
 Interactive docs are available at `http://127.0.0.1:8010/docs`.

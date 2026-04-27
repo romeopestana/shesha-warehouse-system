@@ -51,6 +51,17 @@ class StockMovementOut(BaseModel):
     movement_type: str
     quantity: int
     note: str
+    performed_by: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class InventoryLotOut(BaseModel):
+    id: int
+    product_id: int
+    quantity_remaining: int
     created_at: datetime
 
     class Config:
