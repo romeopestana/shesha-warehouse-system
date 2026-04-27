@@ -193,3 +193,11 @@ class NotificationOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DailyReorderScanOut(BaseModel):
+    run_date: str
+    warehouses_scanned: int
+    proposals_created: int
+    skipped_existing_runs: int
+    proposal_ids: list[int]

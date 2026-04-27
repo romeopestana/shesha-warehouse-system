@@ -115,6 +115,18 @@ class NotificationEvent(Base):
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
+class JobRun(Base):
+    __tablename__ = "job_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    job_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    run_date: Mapped[str] = mapped_column(String(20), nullable=False)
+    warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="completed")
+    details: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class AppUser(Base):
     __tablename__ = "users"
 

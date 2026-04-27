@@ -273,6 +273,17 @@ curl -X POST "http://127.0.0.1:8010/notifications/1/read" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
+## 12) Daily reorder scan job
+
+Trigger daily scan (creates dry-run proposals per low-stock warehouse):
+
+```bash
+curl -X POST "http://127.0.0.1:8010/jobs/daily-reorder-scan" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Re-running the job on the same day skips warehouses already scanned.
+
 ## OpenAPI client generation
 
 OpenAPI schema URL:

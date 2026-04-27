@@ -61,6 +61,7 @@ FastAPI + PostgreSQL starter for the Shesha Warehouse System project.
 - `POST /reorders/proposals/{id}/reject` (admin)
 - `GET /notifications` (admin/clerk, supports `unread_only`, `event_type`, `date_from`, `date_to`)
 - `POST /notifications/{id}/read` (admin/clerk)
+- `POST /jobs/daily-reorder-scan` (admin, idempotent per day/warehouse)
 
 Interactive docs are available at `http://127.0.0.1:8010/docs`.
 

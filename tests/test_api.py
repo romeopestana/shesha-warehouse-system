@@ -900,3 +900,52 @@ def test_notifications_emission_and_read_flow(client):
     unread_after = client.get("/notifications?unread_only=true", headers=clerk_headers)
     assert unread_after.status_code == 200
     assert all(n["id"] != first_id for n in unread_after.json())
+
+
+def test_daily_reorder_scan_job_idempotency(client):
+    admin_headers = _auth_header(client, "admin", "admin123")
+
+    wh = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-O", "location": "Rustenburg"},
+        headers=admin_headers,
+    )
+    assert wh.status_code == 200
+    wh_id = wh.json()["id"]
+
+    product = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T14-JOB",
+            "name": "Job Product",
+            "warehouse_id": wh_id,
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 4,
+        },
+        headers=admin_headers,
+    )
+    assert product.status_code == 200
+
+    first = client.post("/jobs/daily-reorder-scan", headers=admin_headers)
+    assert first.status_code == 200
+    first_payload = first.json()
+    assert first_payload["proposals_created"] >= 1
+    assert len(first_payload["proposal_ids"]) >= 1
+
+    second = client.post("/jobs/daily-reorder-scan", headers=admin_headers)
+    assert second.status_code == 200
+    second_payload = second.json()
+    assert second_payload["proposals_created"] == 0
+    assert second_payload["skipped_existing_runs"] >= 1
+
+    pending = client.get("/reorders/proposals?status=pending", headers=admin_headers)
+    assert pending.status_code == 200
+    assert any(p["id"] == first_payload["proposal_ids"][0] for p in pending.json())
+
+    notifications = client.get(
+        "/notifications?event_type=daily_reorder_scan_summary",
+        headers=admin_headers,
+    )
+    assert notifications.status_code == 200
+    assert len(notifications.json()) >= 2
