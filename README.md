@@ -33,6 +33,9 @@ FastAPI + PostgreSQL starter for the Shesha Warehouse System project.
 - Seed initial admin user:
   - `python -m scripts.seed_admin_user`
   - default credentials: `admin` / `admin123`
+- Seed initial clerk user:
+  - `python -m scripts.seed_clerk_user`
+  - default credentials: `clerk` / `clerk123`
 - Protected stock endpoints:
   - `POST /stock-movements` requires `admin`
   - `GET /stock-movements` requires `admin` or `clerk`
@@ -67,5 +70,8 @@ Interactive docs are available at `http://127.0.0.1:8010/docs`.
 - Windows smoke test script:
   - `scripts/smoke_test.ps1`
   - run with: `.\scripts\smoke_test.ps1`
+- Windows role guard smoke test:
+  - `scripts/smoke_test_roles.ps1`
+  - run with: `.\scripts\smoke_test_roles.ps1`
 - OpenAPI schema:
   - `http://127.0.0.1:8010/openapi.json`
