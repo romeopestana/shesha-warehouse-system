@@ -216,6 +216,31 @@ curl -X POST "http://127.0.0.1:8010/reorders/suggested" \
   }'
 ```
 
+List proposals:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8010/reorders/proposals?status=pending"
+```
+
+Approve proposal:
+
+```bash
+curl -X POST "http://127.0.0.1:8010/reorders/proposals/1/approve" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Reject proposal:
+
+```bash
+curl -X POST "http://127.0.0.1:8010/reorders/proposals/2/reject" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reason": "Budget hold"
+  }'
+```
+
 ## OpenAPI client generation
 
 OpenAPI schema URL:

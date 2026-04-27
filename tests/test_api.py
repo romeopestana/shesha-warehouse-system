@@ -583,6 +583,7 @@ def test_suggested_reorders_dry_run_no_persistence(client):
     )
     assert preview.status_code == 200
     payload = preview.json()
+    assert payload["proposal_id"] is not None
     assert len(payload["created"]) == 1
     assert payload["created"][0]["product_id"] == product_id
     assert payload["created"][0]["quantity_before"] == 1
@@ -596,3 +597,113 @@ def test_suggested_reorders_dry_run_no_persistence(client):
     movements = client.get(f"/stock-movements?product_id={product_id}", headers=admin_headers)
     assert movements.status_code == 200
     assert all(m["note"] != "DRY RUN" for m in movements.json())
+
+
+def test_reorder_proposal_approve_and_reject_flow(client):
+    admin_headers = _auth_header(client, "admin", "admin123")
+    clerk_headers = _auth_header(client, "clerk", "clerk123")
+
+    wh = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-K", "location": "Kimberley"},
+        headers=admin_headers,
+    )
+    assert wh.status_code == 200
+    wh_id = wh.json()["id"]
+
+    p_approve = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T11-APP",
+            "name": "Proposal Approve Product",
+            "warehouse_id": wh_id,
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 6,
+        },
+        headers=admin_headers,
+    )
+    p_reject = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T11-REJ",
+            "name": "Proposal Reject Product",
+            "warehouse_id": wh_id,
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 4,
+        },
+        headers=admin_headers,
+    )
+    assert p_approve.status_code == 200
+    assert p_reject.status_code == 200
+
+    proposal_for_approve = client.post(
+        "/reorders/suggested",
+        json={
+            "warehouse_id": wh_id,
+            "product_ids": [p_approve.json()["id"]],
+            "dry_run": True,
+            "note": "APPROVE ME",
+        },
+        headers=admin_headers,
+    )
+    assert proposal_for_approve.status_code == 200
+    assert proposal_for_approve.json()["proposal_id"] is not None
+
+    # dry-run previews but should not mutate data before approval.
+    products = client.get("/products", headers=admin_headers).json()
+    before_row = [p for p in products if p["id"] == p_approve.json()["id"]][0]
+    assert before_row["quantity_on_hand"] == 1
+
+    proposals = client.get("/reorders/proposals?status=pending", headers=clerk_headers)
+    assert proposals.status_code == 200
+    pending = proposals.json()
+    approve_proposal_id = pending[0]["id"]
+
+    clerk_approve = client.post(
+        f"/reorders/proposals/{approve_proposal_id}/approve",
+        headers=clerk_headers,
+    )
+    assert clerk_approve.status_code == 403
+
+    approved = client.post(
+        f"/reorders/proposals/{approve_proposal_id}/approve",
+        headers=admin_headers,
+    )
+    assert approved.status_code == 200
+    assert approved.json()["status"] == "approved"
+
+    products_after_approve = client.get("/products", headers=admin_headers).json()
+    approved_row = [p for p in products_after_approve if p["id"] == p_approve.json()["id"]][0]
+    assert approved_row["quantity_on_hand"] == 7
+
+    proposal_for_reject = client.post(
+        "/reorders/suggested",
+        json={
+            "warehouse_id": wh_id,
+            "product_ids": [p_reject.json()["id"]],
+            "dry_run": True,
+            "note": "REJECT ME",
+        },
+        headers=admin_headers,
+    )
+    assert proposal_for_reject.status_code == 200
+    assert proposal_for_reject.json()["proposal_id"] is not None
+    pending_after = client.get("/reorders/proposals?status=pending", headers=admin_headers)
+    reject_proposal_id = pending_after.json()[0]["id"]
+
+    rejected = client.post(
+        f"/reorders/proposals/{reject_proposal_id}/reject",
+        json={"reason": "Budget hold"},
+        headers=admin_headers,
+    )
+    assert rejected.status_code == 200
+    assert rejected.json()["status"] == "rejected"
+    assert rejected.json()["rejection_reason"] == "Budget hold"
+
+    reject_then_approve = client.post(
+        f"/reorders/proposals/{reject_proposal_id}/approve",
+        headers=admin_headers,
+    )
+    assert reject_then_approve.status_code == 400

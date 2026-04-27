@@ -73,6 +73,36 @@ class StockTransfer(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class ReorderProposal(Base):
+    __tablename__ = "reorder_proposals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    status: Mapped[str] = mapped_column(String(30), default="pending")
+    note: Mapped[str] = mapped_column(String(255), default="")
+    created_by: Mapped[str] = mapped_column(String(120), nullable=False)
+    reviewed_by: Mapped[str] = mapped_column(String(120), default="")
+    rejection_reason: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    items: Mapped[list["ReorderProposalItem"]] = relationship(back_populates="proposal")
+
+
+class ReorderProposalItem(Base):
+    __tablename__ = "reorder_proposal_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    proposal_id: Mapped[int] = mapped_column(ForeignKey("reorder_proposals.id"), nullable=False)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
+    warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"), nullable=False)
+    quantity_before: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity_added: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    proposal: Mapped["ReorderProposal"] = relationship(back_populates="items")
+
+
 class AppUser(Base):
     __tablename__ = "users"
 

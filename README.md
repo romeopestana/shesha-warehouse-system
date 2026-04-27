@@ -56,6 +56,9 @@ FastAPI + PostgreSQL starter for the Shesha Warehouse System project.
 - `GET /alerts/low-stock` (admin/clerk, optional `warehouse_id` filter)
 - `POST /reorders/suggested` (admin-only bulk restock from low-stock alerts)
   - supports `dry_run` preview mode
+- `GET /reorders/proposals` (admin/clerk, optional `status` filter)
+- `POST /reorders/proposals/{id}/approve` (admin)
+- `POST /reorders/proposals/{id}/reject` (admin)
 
 Interactive docs are available at `http://127.0.0.1:8010/docs`.
 

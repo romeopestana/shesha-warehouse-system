@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.auth import User, require_roles
 from app.database import get_db
-from app.models import InventoryLot, Product, StockMovement
+from app.models import InventoryLot, Product, ReorderProposal, ReorderProposalItem, StockMovement
 from app.schemas import (
+    ReorderProposalOut,
+    ReorderProposalRejectRequest,
     SuggestedReorderCreate,
     SuggestedReorderCreatedItem,
     SuggestedReorderResult,
@@ -28,6 +32,14 @@ def create_suggested_reorders(
         query = query.filter(Product.id.in_(payload.product_ids))
 
     products = query.order_by(Product.id.asc()).all()
+    proposal = ReorderProposal(
+        status="pending",
+        note=payload.note,
+        created_by=current_user.username,
+    )
+    db.add(proposal)
+    db.flush()
+
     created: list[SuggestedReorderCreatedItem] = []
     skipped: list[SuggestedReorderSkippedItem] = []
 
@@ -61,6 +73,16 @@ def create_suggested_reorders(
                 )
             )
             db.add(product)
+
+        proposal_item = ReorderProposalItem(
+            proposal_id=proposal.id,
+            product_id=product.id,
+            warehouse_id=product.warehouse_id,
+            quantity_before=before,
+            quantity_added=product.reorder_quantity,
+            quantity_after=after,
+        )
+        db.add(proposal_item)
         created.append(
             SuggestedReorderCreatedItem(
                 product_id=product.id,
@@ -71,8 +93,101 @@ def create_suggested_reorders(
             )
         )
 
-    if not payload.dry_run:
+    if payload.dry_run:
         db.commit()
-    else:
-        db.rollback()
-    return SuggestedReorderResult(created=created, skipped=skipped)
+        return SuggestedReorderResult(proposal_id=proposal.id, created=created, skipped=skipped)
+
+    # Non-dry runs execute immediately and auto-approve the generated proposal.
+    proposal.status = "approved"
+    proposal.reviewed_by = current_user.username
+    proposal.reviewed_at = datetime.utcnow()
+    db.add(proposal)
+    db.commit()
+    return SuggestedReorderResult(proposal_id=proposal.id, created=created, skipped=skipped)
+
+
+@router.get("/proposals", response_model=list[ReorderProposalOut])
+def list_reorder_proposals(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "clerk")),
+    status: str | None = Query(default=None),
+):
+    query = db.query(ReorderProposal)
+    if status is not None:
+        query = query.filter(ReorderProposal.status == status)
+    return query.order_by(ReorderProposal.id.desc()).all()
+
+
+@router.post("/proposals/{proposal_id}/approve", response_model=ReorderProposalOut)
+def approve_reorder_proposal(
+    proposal_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    proposal = db.query(ReorderProposal).filter(ReorderProposal.id == proposal_id).first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    if proposal.status != "pending":
+        raise HTTPException(status_code=400, detail="Proposal is not pending")
+
+    items = (
+        db.query(ReorderProposalItem)
+        .filter(ReorderProposalItem.proposal_id == proposal.id)
+        .order_by(ReorderProposalItem.id.asc())
+        .all()
+    )
+    for item in items:
+        product = db.query(Product).filter(Product.id == item.product_id).first()
+        if not product:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Product {item.product_id} no longer exists",
+            )
+        product.quantity_on_hand += item.quantity_added
+        db.add(
+            InventoryLot(
+                product_id=product.id,
+                quantity_remaining=item.quantity_added,
+            )
+        )
+        db.add(
+            StockMovement(
+                product_id=product.id,
+                movement_type="IN",
+                quantity=item.quantity_added,
+                note=f"APPROVED_REORDER_PROPOSAL:{proposal.id} {proposal.note}".strip(),
+                performed_by=current_user.username,
+            )
+        )
+        db.add(product)
+
+    proposal.status = "approved"
+    proposal.reviewed_by = current_user.username
+    proposal.reviewed_at = datetime.utcnow()
+    db.add(proposal)
+    db.commit()
+    db.refresh(proposal)
+    return proposal
+
+
+@router.post("/proposals/{proposal_id}/reject", response_model=ReorderProposalOut)
+def reject_reorder_proposal(
+    proposal_id: int,
+    payload: ReorderProposalRejectRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    proposal = db.query(ReorderProposal).filter(ReorderProposal.id == proposal_id).first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    if proposal.status != "pending":
+        raise HTTPException(status_code=400, detail="Proposal is not pending")
+
+    proposal.status = "rejected"
+    proposal.reviewed_by = current_user.username
+    proposal.reviewed_at = datetime.utcnow()
+    proposal.rejection_reason = payload.reason
+    db.add(proposal)
+    db.commit()
+    db.refresh(proposal)
+    return proposal

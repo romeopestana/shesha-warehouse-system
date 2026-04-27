@@ -127,5 +127,38 @@ class SuggestedReorderSkippedItem(BaseModel):
 
 
 class SuggestedReorderResult(BaseModel):
+    proposal_id: int | None = None
     created: list[SuggestedReorderCreatedItem]
     skipped: list[SuggestedReorderSkippedItem]
+
+
+class ReorderProposalItemOut(BaseModel):
+    id: int
+    product_id: int
+    warehouse_id: int
+    quantity_before: int
+    quantity_added: int
+    quantity_after: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReorderProposalOut(BaseModel):
+    id: int
+    status: str
+    note: str
+    created_by: str
+    reviewed_by: str
+    rejection_reason: str
+    created_at: datetime
+    reviewed_at: datetime | None = None
+    items: list[ReorderProposalItemOut]
+
+    class Config:
+        from_attributes = True
+
+
+class ReorderProposalRejectRequest(BaseModel):
+    reason: str = Field(min_length=1)
