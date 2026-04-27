@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -43,7 +43,7 @@ def mark_notification_read(
         raise HTTPException(status_code=404, detail="Notification not found")
     notification.is_read = 1
     if notification.read_at is None:
-        notification.read_at = datetime.utcnow()
+        notification.read_at = datetime.now(timezone.utc)
     db.add(notification)
     db.commit()
     db.refresh(notification)

@@ -1,9 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class Warehouse(Base):
@@ -12,7 +16,7 @@ class Warehouse(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     location: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     products: Mapped[list["Product"]] = relationship(back_populates="warehouse")
 
@@ -27,7 +31,7 @@ class Product(Base):
     reorder_level: Mapped[int] = mapped_column(Integer, default=0)
     reorder_quantity: Mapped[int] = mapped_column(Integer, default=0)
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     warehouse: Mapped["Warehouse"] = relationship(back_populates="products")
     stock_movements: Mapped[list["StockMovement"]] = relationship(back_populates="product")
@@ -40,7 +44,7 @@ class InventoryLot(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
     quantity_remaining: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     product: Mapped["Product"] = relationship(back_populates="inventory_lots")
 
@@ -54,7 +58,7 @@ class StockMovement(Base):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     note: Mapped[str] = mapped_column(String(255), default="")
     performed_by: Mapped[str] = mapped_column(String(120), default="system")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     product: Mapped["Product"] = relationship(back_populates="stock_movements")
 
@@ -70,7 +74,7 @@ class StockTransfer(Base):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     note: Mapped[str] = mapped_column(String(255), default="")
     performed_by: Mapped[str] = mapped_column(String(120), default="system")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class ReorderProposal(Base):
@@ -82,7 +86,7 @@ class ReorderProposal(Base):
     created_by: Mapped[str] = mapped_column(String(120), nullable=False)
     reviewed_by: Mapped[str] = mapped_column(String(120), default="")
     rejection_reason: Mapped[str] = mapped_column(String(255), default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     items: Mapped[list["ReorderProposalItem"]] = relationship(back_populates="proposal")
@@ -98,7 +102,7 @@ class ReorderProposalItem(Base):
     quantity_before: Mapped[int] = mapped_column(Integer, nullable=False)
     quantity_added: Mapped[int] = mapped_column(Integer, nullable=False)
     quantity_after: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     proposal: Mapped["ReorderProposal"] = relationship(back_populates="items")
 
@@ -111,7 +115,7 @@ class NotificationEvent(Base):
     message: Mapped[str] = mapped_column(String(255), nullable=False)
     related_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_read: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
@@ -124,7 +128,7 @@ class JobRun(Base):
     warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="completed")
     details: Mapped[str] = mapped_column(String(255), default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class AppUser(Base):
@@ -135,4 +139,4 @@ class AppUser(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), nullable=False)
     disabled: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)

@@ -76,7 +76,7 @@ Notes:
 - `POST /reorders/suggested` (admin-only bulk restock from low-stock alerts)
   - supports `dry_run` preview mode
 - `GET /reorders/proposals` (admin/clerk, optional `status` filter)
-- `POST /reorders/proposals/{id}/approve` (admin, supports `force=true` for stock-level drift override)
+- `POST /reorders/proposals/{id}/approve` (admin, supports `force=true`; requires user-specified `item_quantities`)
 - `POST /reorders/proposals/{id}/reject` (admin)
 - `GET /notifications` (admin/clerk, supports `unread_only`, `event_type`, `date_from`, `date_to`)
 - `POST /notifications/{id}/read` (admin/clerk)
@@ -107,10 +107,9 @@ Interactive docs are available at `http://127.0.0.1:8010/docs`.
 - Job action:
   - obtains JWT from `/auth/token`
   - calls `POST /jobs/daily-reorder-scan`
-- Auto-approval policy (optional):
-  - set `DAILY_SCAN_AUTO_APPROVE_MAX_QUANTITY` in environment
-  - `0` (default) keeps all daily scan proposals pending
-  - values `> 0` auto-approve proposals whose total reorder quantity is at or below the threshold
+- Approval policy:
+  - all reorder proposals remain `pending` until an admin explicitly approves
+  - no automatic approvals are performed by daily scan or suggestion endpoints
 
 ## API Usage Examples
 

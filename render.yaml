@@ -16,8 +16,6 @@ services:
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "60"
-      - key: DAILY_SCAN_AUTO_APPROVE_MAX_QUANTITY
-        value: "0"
 
 databases:
   - name: shesha-warehouse-db

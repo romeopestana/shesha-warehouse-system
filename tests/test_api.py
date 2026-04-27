@@ -1,7 +1,4 @@
-from datetime import datetime, timedelta
-
-from app.config import settings
-
+from datetime import datetime, timedelta, timezone
 
 def _auth_header(client, username="admin", password="admin123"):
     response = client.post(
@@ -119,9 +116,9 @@ def test_audit_fields_and_filters(client):
     assert len(filtered.json()) >= 1
     assert all(m["product_id"] == product_id for m in filtered.json())
 
-    now = datetime.utcnow()
-    start = (now - timedelta(minutes=1)).isoformat()
-    end = (now + timedelta(minutes=1)).isoformat()
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+    end = (now + timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
     by_date = client.get(
         f"/stock-movements?product_id={product_id}&date_from={start}&date_to={end}",
         headers=headers,
@@ -383,9 +380,9 @@ def test_stock_transfer_list_filters_and_roles(client):
         t["destination_warehouse_id"] == wh_b.json()["id"] for t in by_destination.json()
     )
 
-    now = datetime.utcnow()
-    start = (now - timedelta(minutes=1)).isoformat()
-    end = (now + timedelta(minutes=1)).isoformat()
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+    end = (now + timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
     by_date = client.get(
         f"/stock-transfers?date_from={start}&date_to={end}",
         headers=admin_headers,
@@ -539,12 +536,9 @@ def test_suggested_reorders_create_and_skip(client):
     assert len(payload["skipped"]) == 1
     assert payload["skipped"][0]["product_id"] == low_zero_reorder.json()["id"]
 
-    movements = client.get(
-        f"/stock-movements?product_id={low_with_reorder.json()['id']}",
-        headers=admin_headers,
-    )
-    assert movements.status_code == 200
-    assert any(m["note"] == "AUTO TEST REORDER" for m in movements.json())
+    proposals = client.get("/reorders/proposals?status=pending", headers=admin_headers)
+    assert proposals.status_code == 200
+    assert any(p["id"] == payload["proposal_id"] for p in proposals.json())
 
 
 def test_suggested_reorders_dry_run_no_persistence(client):
@@ -665,12 +659,16 @@ def test_reorder_proposal_approve_and_reject_flow(client):
 
     clerk_approve = client.post(
         f"/reorders/proposals/{approve_proposal_id}/approve",
+        json={"item_quantities": []},
         headers=clerk_headers,
     )
     assert clerk_approve.status_code == 403
 
+    proposal_row = [p for p in pending if p["id"] == approve_proposal_id][0]
+    approve_item_id = proposal_row["items"][0]["id"]
     approved = client.post(
         f"/reorders/proposals/{approve_proposal_id}/approve",
+        json={"item_quantities": [{"item_id": approve_item_id, "quantity_added": 6}]},
         headers=admin_headers,
     )
     assert approved.status_code == 200
@@ -706,6 +704,7 @@ def test_reorder_proposal_approve_and_reject_flow(client):
 
     reject_then_approve = client.post(
         f"/reorders/proposals/{reject_proposal_id}/approve",
+        json={"item_quantities": []},
         headers=admin_headers,
     )
     assert reject_then_approve.status_code == 400
@@ -775,8 +774,17 @@ def test_reorder_proposal_drift_checks_and_force_override(client):
     )
     assert restock_force_product.status_code == 200
 
+    proposal_rows = client.get("/reorders/proposals?status=pending", headers=admin_headers).json()
+    proposal_row = [p for p in proposal_rows if p["id"] == proposal_id][0]
+    item_map = {item["product_id"]: item["id"] for item in proposal_row["items"]}
     without_force = client.post(
         f"/reorders/proposals/{proposal_id}/approve",
+        json={
+            "item_quantities": [
+                {"item_id": item_map[p_drift.json()["id"]], "quantity_added": 4},
+                {"item_id": item_map[p_force.json()["id"]], "quantity_added": 3},
+            ]
+        },
         headers=admin_headers,
     )
     assert without_force.status_code == 200
@@ -826,8 +834,12 @@ def test_reorder_proposal_drift_checks_and_force_override(client):
     )
     assert lift_stock.status_code == 200
 
+    force_rows = client.get("/reorders/proposals?status=pending", headers=admin_headers).json()
+    force_row = [p for p in force_rows if p["id"] == proposal_force_id][0]
+    force_item_id = force_row["items"][0]["id"]
     with_force = client.post(
         f"/reorders/proposals/{proposal_force_id}/approve?force=true",
+        json={"item_quantities": [{"item_id": force_item_id, "quantity_added": 2}]},
         headers=admin_headers,
     )
     assert with_force.status_code == 200
@@ -879,8 +891,12 @@ def test_notifications_emission_and_read_flow(client):
     proposal_id = proposal.json()["proposal_id"]
     assert proposal_id is not None
 
+    proposal_rows = client.get("/reorders/proposals?status=pending", headers=admin_headers).json()
+    proposal_row = [p for p in proposal_rows if p["id"] == proposal_id][0]
+    item_id = proposal_row["items"][0]["id"]
     approved = client.post(
         f"/reorders/proposals/{proposal_id}/approve",
+        json={"item_quantities": [{"item_id": item_id, "quantity_added": 3}]},
         headers=admin_headers,
     )
     assert approved.status_code == 200
@@ -954,42 +970,36 @@ def test_daily_reorder_scan_job_idempotency(client):
     assert len(notifications.json()) >= 2
 
 
-def test_daily_reorder_scan_auto_approve_policy(client):
+def test_daily_reorder_scan_requires_manual_approval(client):
     admin_headers = _auth_header(client, "admin", "admin123")
-    previous_threshold = settings.daily_scan_auto_approve_max_quantity
-    settings.daily_scan_auto_approve_max_quantity = 10
-    try:
-        wh = client.post(
-            "/warehouses",
-            json={"name": "Warehouse-P", "location": "George"},
-            headers=admin_headers,
-        )
-        assert wh.status_code == 200
-        wh_id = wh.json()["id"]
+    wh = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-P", "location": "George"},
+        headers=admin_headers,
+    )
+    assert wh.status_code == 200
+    wh_id = wh.json()["id"]
 
-        product = client.post(
-            "/products",
-            json={
-                "sku": "SKU-T15-AUTO",
-                "name": "Auto Policy Product",
-                "warehouse_id": wh_id,
-                "quantity_on_hand": 1,
-                "reorder_level": 5,
-                "reorder_quantity": 4,
-            },
-            headers=admin_headers,
-        )
-        assert product.status_code == 200
-        product_id = product.json()["id"]
+    product = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T15-AUTO",
+            "name": "Auto Policy Product",
+            "warehouse_id": wh_id,
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 4,
+        },
+        headers=admin_headers,
+    )
+    assert product.status_code == 200
+    product_id = product.json()["id"]
 
-        run = client.post("/jobs/daily-reorder-scan", headers=admin_headers)
-        assert run.status_code == 200
-        payload = run.json()
-        assert len(payload["auto_approved_ids"]) >= 1
-        assert len(payload["pending_ids"]) == 0
+    run = client.post("/jobs/daily-reorder-scan", headers=admin_headers)
+    assert run.status_code == 200
+    payload = run.json()
+    assert len(payload["pending_ids"]) >= 1
 
-        movements = client.get(f"/stock-movements?product_id={product_id}", headers=admin_headers)
-        assert movements.status_code == 200
-        assert any("DAILY_SCAN_AUTO_APPROVED" in m["note"] for m in movements.json())
-    finally:
-        settings.daily_scan_auto_approve_max_quantity = previous_threshold
+    movements = client.get(f"/stock-movements?product_id={product_id}", headers=admin_headers)
+    assert movements.status_code == 200
+    assert all("DAILY_SCAN_AUTO_APPROVED" not in m["note"] for m in movements.json())

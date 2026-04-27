@@ -227,14 +227,27 @@ Approve proposal:
 
 ```bash
 curl -X POST "http://127.0.0.1:8010/reorders/proposals/1/approve" \
-  -H "Authorization: Bearer $TOKEN"
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "item_quantities": [
+      { "item_id": 10, "quantity_added": 25 },
+      { "item_id": 11, "quantity_added": 12 }
+    ]
+  }'
 ```
 
 Approve with force override (only bypasses low-stock drift):
 
 ```bash
 curl -X POST "http://127.0.0.1:8010/reorders/proposals/1/approve?force=true" \
-  -H "Authorization: Bearer $TOKEN"
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "item_quantities": [
+      { "item_id": 10, "quantity_added": 25 }
+    ]
+  }'
 ```
 
 Approval responses include `applied` and `blocked` item arrays with drift reasons.
@@ -283,7 +296,7 @@ curl -X POST "http://127.0.0.1:8010/jobs/daily-reorder-scan" \
 ```
 
 Re-running the job on the same day skips warehouses already scanned.
-Response includes `auto_approved_ids` and `pending_ids`.
+Response includes pending proposal IDs only; approvals are always manual.
 
 ## OpenAPI client generation
 

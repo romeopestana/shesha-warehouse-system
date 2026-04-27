@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class WarehouseCreate(BaseModel):
@@ -15,8 +15,7 @@ class WarehouseOut(BaseModel):
     location: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProductCreate(BaseModel):
@@ -38,8 +37,7 @@ class ProductOut(BaseModel):
     warehouse_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StockMovementCreate(BaseModel):
@@ -58,8 +56,7 @@ class StockMovementOut(BaseModel):
     performed_by: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InventoryLotOut(BaseModel):
@@ -68,8 +65,7 @@ class InventoryLotOut(BaseModel):
     quantity_remaining: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StockTransferCreate(BaseModel):
@@ -90,8 +86,7 @@ class StockTransferOut(BaseModel):
     performed_by: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LowStockAlertOut(BaseModel):
@@ -141,8 +136,7 @@ class ReorderProposalItemOut(BaseModel):
     quantity_after: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReorderProposalOut(BaseModel):
@@ -156,12 +150,20 @@ class ReorderProposalOut(BaseModel):
     reviewed_at: datetime | None = None
     items: list[ReorderProposalItemOut]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReorderProposalRejectRequest(BaseModel):
     reason: str = Field(min_length=1)
+
+
+class ReorderProposalApproveItem(BaseModel):
+    item_id: int
+    quantity_added: int = Field(gt=0)
+
+
+class ReorderProposalApproveRequest(BaseModel):
+    item_quantities: list[ReorderProposalApproveItem]
 
 
 class ReorderApprovalBlockedItem(BaseModel):
@@ -191,8 +193,7 @@ class NotificationOut(BaseModel):
     created_at: datetime
     read_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DailyReorderScanOut(BaseModel):
@@ -201,5 +202,4 @@ class DailyReorderScanOut(BaseModel):
     proposals_created: int
     skipped_existing_runs: int
     proposal_ids: list[int]
-    auto_approved_ids: list[int]
     pending_ids: list[int]
