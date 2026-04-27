@@ -59,3 +59,13 @@ Interactive docs are available at `http://127.0.0.1:8010/docs`.
   - applies migrations
   - seeds admin user
   - executes API tests (auth, roles, FIFO, and audit filters)
+
+## API Usage Examples
+
+- End-to-end `curl` examples:
+  - `docs/api-examples.md`
+- Windows smoke test script:
+  - `scripts/smoke_test.ps1`
+  - run with: `.\scripts\smoke_test.ps1`
+- OpenAPI schema:
+  - `http://127.0.0.1:8010/openapi.json`
