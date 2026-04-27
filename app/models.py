@@ -103,6 +103,18 @@ class ReorderProposalItem(Base):
     proposal: Mapped["ReorderProposal"] = relationship(back_populates="items")
 
 
+class NotificationEvent(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    message: Mapped[str] = mapped_column(String(255), nullable=False)
+    related_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_read: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class AppUser(Base):
     __tablename__ = "users"
 

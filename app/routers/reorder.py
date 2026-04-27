@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth import User, require_roles
 from app.database import get_db
 from app.models import InventoryLot, Product, ReorderProposal, ReorderProposalItem, StockMovement
+from app.notifications import emit_notification
 from app.schemas import (
     ReorderApprovalAppliedItem,
     ReorderApprovalBlockedItem,
@@ -42,6 +43,12 @@ def create_suggested_reorders(
     )
     db.add(proposal)
     db.flush()
+    emit_notification(
+        db=db,
+        event_type="reorder_proposal_submitted",
+        message=f"Reorder proposal #{proposal.id} submitted by {current_user.username}",
+        related_id=proposal.id,
+    )
 
     created: list[SuggestedReorderCreatedItem] = []
     skipped: list[SuggestedReorderSkippedItem] = []
@@ -105,6 +112,12 @@ def create_suggested_reorders(
     proposal.reviewed_by = current_user.username
     proposal.reviewed_at = datetime.utcnow()
     db.add(proposal)
+    emit_notification(
+        db=db,
+        event_type="reorder_proposal_approved",
+        message=f"Reorder proposal #{proposal.id} auto-approved",
+        related_id=proposal.id,
+    )
     db.commit()
     return SuggestedReorderResult(proposal_id=proposal.id, created=created, skipped=skipped)
 
@@ -208,6 +221,12 @@ def approve_reorder_proposal(
     proposal.reviewed_by = current_user.username
     proposal.reviewed_at = datetime.utcnow()
     db.add(proposal)
+    emit_notification(
+        db=db,
+        event_type="reorder_proposal_approved",
+        message=f"Reorder proposal #{proposal.id} approved by {current_user.username}",
+        related_id=proposal.id,
+    )
     db.commit()
     db.refresh(proposal)
     return ReorderProposalApprovalResult(proposal=proposal, applied=applied, blocked=blocked)
@@ -231,6 +250,12 @@ def reject_reorder_proposal(
     proposal.reviewed_at = datetime.utcnow()
     proposal.rejection_reason = payload.reason
     db.add(proposal)
+    emit_notification(
+        db=db,
+        event_type="reorder_proposal_rejected",
+        message=f"Reorder proposal #{proposal.id} rejected by {current_user.username}",
+        related_id=proposal.id,
+    )
     db.commit()
     db.refresh(proposal)
     return proposal

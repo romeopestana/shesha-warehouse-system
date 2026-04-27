@@ -832,3 +832,71 @@ def test_reorder_proposal_drift_checks_and_force_override(client):
     forced_payload = with_force.json()
     assert len(forced_payload["applied"]) == 1
     assert len(forced_payload["blocked"]) == 0
+
+
+def test_notifications_emission_and_read_flow(client):
+    admin_headers = _auth_header(client, "admin", "admin123")
+    clerk_headers = _auth_header(client, "clerk", "clerk123")
+
+    wh = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-N", "location": "Welkom"},
+        headers=admin_headers,
+    )
+    assert wh.status_code == 200
+    wh_id = wh.json()["id"]
+
+    product = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T13-NOTIFY",
+            "name": "Notify Product",
+            "warehouse_id": wh_id,
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 3,
+        },
+        headers=admin_headers,
+    )
+    assert product.status_code == 200
+
+    observed = client.get("/alerts/low-stock", headers=clerk_headers)
+    assert observed.status_code == 200
+
+    proposal = client.post(
+        "/reorders/suggested",
+        json={
+            "warehouse_id": wh_id,
+            "product_ids": [product.json()["id"]],
+            "dry_run": True,
+            "note": "NOTIFY PROPOSAL",
+        },
+        headers=admin_headers,
+    )
+    assert proposal.status_code == 200
+    proposal_id = proposal.json()["proposal_id"]
+    assert proposal_id is not None
+
+    approved = client.post(
+        f"/reorders/proposals/{proposal_id}/approve",
+        headers=admin_headers,
+    )
+    assert approved.status_code == 200
+
+    notifications = client.get("/notifications?unread_only=true", headers=clerk_headers)
+    assert notifications.status_code == 200
+    rows = notifications.json()
+    assert len(rows) >= 3
+    event_types = {row["event_type"] for row in rows}
+    assert "low_stock_observed" in event_types
+    assert "reorder_proposal_submitted" in event_types
+    assert "reorder_proposal_approved" in event_types
+
+    first_id = rows[0]["id"]
+    mark_read = client.post(f"/notifications/{first_id}/read", headers=clerk_headers)
+    assert mark_read.status_code == 200
+    assert mark_read.json()["is_read"] == 1
+
+    unread_after = client.get("/notifications?unread_only=true", headers=clerk_headers)
+    assert unread_after.status_code == 200
+    assert all(n["id"] != first_id for n in unread_after.json())

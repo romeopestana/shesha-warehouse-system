@@ -180,3 +180,16 @@ class ReorderProposalApprovalResult(BaseModel):
     proposal: ReorderProposalOut
     applied: list[ReorderApprovalAppliedItem]
     blocked: list[ReorderApprovalBlockedItem]
+
+
+class NotificationOut(BaseModel):
+    id: int
+    event_type: str
+    message: str
+    related_id: int | None = None
+    is_read: int
+    created_at: datetime
+    read_at: datetime | None = None
+
+    class Config:
+        from_attributes = True

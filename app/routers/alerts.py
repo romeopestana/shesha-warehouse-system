@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth import User, require_roles
 from app.database import get_db
 from app.models import Product, Warehouse
+from app.notifications import emit_notification
 from app.schemas import LowStockAlertOut
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -22,6 +23,12 @@ def list_low_stock_alerts(
         query = query.filter(Product.warehouse_id == warehouse_id)
 
     rows = query.order_by(Product.quantity_on_hand.asc(), Product.id.asc()).all()
+    emit_notification(
+        db=db,
+        event_type="low_stock_observed",
+        message=f"Low-stock alerts viewed ({len(rows)} items)",
+        related_id=warehouse_id,
+    )
     return [
         LowStockAlertOut(
             product_id=product.id,

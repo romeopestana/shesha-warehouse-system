@@ -250,6 +250,29 @@ curl -X POST "http://127.0.0.1:8010/reorders/proposals/2/reject" \
   }'
 ```
 
+## 11) Notifications
+
+List unread notifications:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8010/notifications?unread_only=true"
+```
+
+Filter notifications by event type:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8010/notifications?event_type=reorder_proposal_approved"
+```
+
+Mark notification as read:
+
+```bash
+curl -X POST "http://127.0.0.1:8010/notifications/1/read" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ## OpenAPI client generation
 
 OpenAPI schema URL:
