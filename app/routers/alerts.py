@@ -29,6 +29,7 @@ def list_low_stock_alerts(
         message=f"Low-stock alerts viewed ({len(rows)} items)",
         related_id=warehouse_id,
     )
+    db.commit()
     return [
         LowStockAlertOut(
             product_id=product.id,
