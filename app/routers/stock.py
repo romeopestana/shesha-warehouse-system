@@ -15,9 +15,6 @@ def create_stock_movement(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("admin")),
 ):
-    # Ensure FIFO lot table exists even when migrations are not yet applied.
-    InventoryLot.__table__.create(bind=db.get_bind(), checkfirst=True)
-
     product = db.query(Product).filter(Product.id == payload.product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")

@@ -21,7 +21,9 @@ FastAPI + PostgreSQL starter for the Shesha Warehouse System project.
 4. Start PostgreSQL:
    - `docker compose up -d`
    - This project uses host port `5433` to avoid conflicts with other local Postgres services.
-5. Run API:
+5. Run migrations:
+   - `alembic upgrade head`
+6. Run API:
    - `uvicorn app.main:app --reload --port 8010`
 
 ## Authentication

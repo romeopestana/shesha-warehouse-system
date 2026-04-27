@@ -10,9 +10,6 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 @router.post("", response_model=ProductOut)
 def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
-    # Ensure the FIFO lot table exists even without migration tooling.
-    InventoryLot.__table__.create(bind=db.get_bind(), checkfirst=True)
-
     warehouse = db.query(Warehouse).filter(Warehouse.id == payload.warehouse_id).first()
     if not warehouse:
         raise HTTPException(status_code=404, detail="Warehouse not found")
