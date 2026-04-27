@@ -4,11 +4,16 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
+from passlib.context import CryptContext
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import get_db
+from app.models import AppUser
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+password_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
 class User(BaseModel):
@@ -18,35 +23,27 @@ class User(BaseModel):
 
 
 class UserInDB(User):
-    password: str
+    hashed_password: str
 
 
-# Demo users for initial scaffold.
-fake_users_db = {
-    "admin": UserInDB(
-        username="admin",
-        role="admin",
-        disabled=False,
-        password="admin123",
-    ),
-    "clerk": UserInDB(
-        username="clerk",
-        role="clerk",
-        disabled=False,
-        password="clerk123",
-    ),
-}
+def hash_password(plain_password: str) -> str:
+    return password_context.hash(plain_password)
 
 
-def verify_password(plain_password: str, saved_password: str) -> bool:
-    return plain_password == saved_password
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return password_context.verify(plain_password, hashed_password)
 
 
-def authenticate_user(username: str, password: str) -> UserInDB | None:
-    user = fake_users_db.get(username)
-    if not user or not verify_password(password, user.password):
+def authenticate_user(db: Session, username: str, password: str) -> UserInDB | None:
+    user = db.query(AppUser).filter(AppUser.username == username).first()
+    if not user or not verify_password(password, user.hashed_password):
         return None
-    return user
+    return UserInDB(
+        username=user.username,
+        role=user.role,
+        disabled=bool(user.disabled),
+        hashed_password=user.hashed_password,
+    )
 
 
 def create_access_token(subject: str, role: str) -> str:
@@ -57,7 +54,10 @@ def create_access_token(subject: str, role: str) -> str:
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> User:
+def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Session = Depends(get_db),
+) -> User:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -74,10 +74,10 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> User:
     except JWTError as exc:
         raise credentials_error from exc
 
-    user = fake_users_db.get(username)
-    if user is None or user.disabled:
+    user = db.query(AppUser).filter(AppUser.username == username).first()
+    if user is None or bool(user.disabled):
         raise credentials_error
-    return User(username=user.username, role=user.role, disabled=user.disabled)
+    return User(username=user.username, role=user.role, disabled=bool(user.disabled))
 
 
 def require_roles(*roles: str):
