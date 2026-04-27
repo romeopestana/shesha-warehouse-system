@@ -201,3 +201,5 @@ class DailyReorderScanOut(BaseModel):
     proposals_created: int
     skipped_existing_runs: int
     proposal_ids: list[int]
+    auto_approved_ids: list[int]
+    pending_ids: list[int]

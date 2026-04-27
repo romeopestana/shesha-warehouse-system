@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.auth import User, require_roles
+from app.config import settings
 from app.database import get_db
-from app.models import JobRun, Product, ReorderProposal, ReorderProposalItem
+from app.models import InventoryLot, JobRun, Product, ReorderProposal, ReorderProposalItem, StockMovement
 from app.notifications import emit_notification
 from app.schemas import DailyReorderScanOut
 
@@ -33,6 +34,8 @@ def run_daily_reorder_scan(
         by_warehouse.setdefault(product.warehouse_id, []).append(product)
 
     proposal_ids: list[int] = []
+    auto_approved_ids: list[int] = []
+    pending_ids: list[int] = []
     skipped_existing_runs = 0
 
     for warehouse_id, products in by_warehouse.items():
@@ -57,9 +60,11 @@ def run_daily_reorder_scan(
         db.add(proposal)
         db.flush()
 
+        total_added = 0
         for product in products:
             before = product.quantity_on_hand
             added = product.reorder_quantity
+            total_added += added
             db.add(
                 ReorderProposalItem(
                     proposal_id=proposal.id,
@@ -69,6 +74,49 @@ def run_daily_reorder_scan(
                     quantity_added=added,
                     quantity_after=before + added,
                 )
+            )
+
+        if (
+            settings.daily_scan_auto_approve_max_quantity > 0
+            and total_added <= settings.daily_scan_auto_approve_max_quantity
+        ):
+            for product in products:
+                product.quantity_on_hand += product.reorder_quantity
+                db.add(
+                    InventoryLot(
+                        product_id=product.id,
+                        quantity_remaining=product.reorder_quantity,
+                    )
+                )
+                db.add(
+                    StockMovement(
+                        product_id=product.id,
+                        movement_type="IN",
+                        quantity=product.reorder_quantity,
+                        note=f"DAILY_SCAN_AUTO_APPROVED:{proposal.id}",
+                        performed_by=current_user.username,
+                    )
+                )
+                db.add(product)
+
+            proposal.status = "approved"
+            proposal.reviewed_by = current_user.username
+            proposal.reviewed_at = datetime.utcnow()
+            db.add(proposal)
+            auto_approved_ids.append(proposal.id)
+            emit_notification(
+                db=db,
+                event_type="daily_scan_auto_approved",
+                message=f"Daily scan proposal #{proposal.id} auto-approved",
+                related_id=proposal.id,
+            )
+        else:
+            pending_ids.append(proposal.id)
+            emit_notification(
+                db=db,
+                event_type="daily_scan_requires_manual_approval",
+                message=f"Daily scan proposal #{proposal.id} requires manual approval",
+                related_id=proposal.id,
             )
 
         db.add(
@@ -105,4 +153,6 @@ def run_daily_reorder_scan(
         proposals_created=len(proposal_ids),
         skipped_existing_runs=skipped_existing_runs,
         proposal_ids=proposal_ids,
+        auto_approved_ids=auto_approved_ids,
+        pending_ids=pending_ids,
     )

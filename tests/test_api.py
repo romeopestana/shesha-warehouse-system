@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+from app.config import settings
+
 
 def _auth_header(client, username="admin", password="admin123"):
     response = client.post(
@@ -932,6 +934,7 @@ def test_daily_reorder_scan_job_idempotency(client):
     first_payload = first.json()
     assert first_payload["proposals_created"] >= 1
     assert len(first_payload["proposal_ids"]) >= 1
+    assert len(first_payload["pending_ids"]) >= 1
 
     second = client.post("/jobs/daily-reorder-scan", headers=admin_headers)
     assert second.status_code == 200
@@ -949,3 +952,44 @@ def test_daily_reorder_scan_job_idempotency(client):
     )
     assert notifications.status_code == 200
     assert len(notifications.json()) >= 2
+
+
+def test_daily_reorder_scan_auto_approve_policy(client):
+    admin_headers = _auth_header(client, "admin", "admin123")
+    previous_threshold = settings.daily_scan_auto_approve_max_quantity
+    settings.daily_scan_auto_approve_max_quantity = 10
+    try:
+        wh = client.post(
+            "/warehouses",
+            json={"name": "Warehouse-P", "location": "George"},
+            headers=admin_headers,
+        )
+        assert wh.status_code == 200
+        wh_id = wh.json()["id"]
+
+        product = client.post(
+            "/products",
+            json={
+                "sku": "SKU-T15-AUTO",
+                "name": "Auto Policy Product",
+                "warehouse_id": wh_id,
+                "quantity_on_hand": 1,
+                "reorder_level": 5,
+                "reorder_quantity": 4,
+            },
+            headers=admin_headers,
+        )
+        assert product.status_code == 200
+        product_id = product.json()["id"]
+
+        run = client.post("/jobs/daily-reorder-scan", headers=admin_headers)
+        assert run.status_code == 200
+        payload = run.json()
+        assert len(payload["auto_approved_ids"]) >= 1
+        assert len(payload["pending_ids"]) == 0
+
+        movements = client.get(f"/stock-movements?product_id={product_id}", headers=admin_headers)
+        assert movements.status_code == 200
+        assert any("DAILY_SCAN_AUTO_APPROVED" in m["note"] for m in movements.json())
+    finally:
+        settings.daily_scan_auto_approve_max_quantity = previous_threshold

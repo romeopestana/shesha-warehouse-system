@@ -283,6 +283,7 @@ curl -X POST "http://127.0.0.1:8010/jobs/daily-reorder-scan" \
 ```
 
 Re-running the job on the same day skips warehouses already scanned.
+Response includes `auto_approved_ids` and `pending_ids`.
 
 ## OpenAPI client generation
 

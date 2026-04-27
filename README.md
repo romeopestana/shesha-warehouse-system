@@ -107,6 +107,10 @@ Interactive docs are available at `http://127.0.0.1:8010/docs`.
 - Job action:
   - obtains JWT from `/auth/token`
   - calls `POST /jobs/daily-reorder-scan`
+- Auto-approval policy (optional):
+  - set `DAILY_SCAN_AUTO_APPROVE_MAX_QUANTITY` in environment
+  - `0` (default) keeps all daily scan proposals pending
+  - values `> 0` auto-approve proposals whose total reorder quantity is at or below the threshold
 
 ## API Usage Examples
 
