@@ -155,6 +155,37 @@ curl -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:8010/stock-transfers?source_warehouse_id=1&destination_warehouse_id=2&date_from=2026-04-01T00:00:00&date_to=2026-04-30T23:59:59"
 ```
 
+## 9) Low stock alerts
+
+Create a product with alert thresholds:
+
+```bash
+curl -X POST "http://127.0.0.1:8010/products" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sku": "SKU-LOW-001",
+    "name": "Low Threshold Item",
+    "warehouse_id": 1,
+    "quantity_on_hand": 2,
+    "reorder_level": 5,
+    "reorder_quantity": 20
+  }'
+```
+
+List low-stock alerts:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8010/alerts/low-stock"
+```
+
+Filter alerts by warehouse:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8010/alerts/low-stock?warehouse_id=1"
+```
+
 ## OpenAPI client generation
 
 OpenAPI schema URL:

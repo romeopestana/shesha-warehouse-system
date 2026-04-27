@@ -24,6 +24,8 @@ class Product(Base):
     sku: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     quantity_on_hand: Mapped[int] = mapped_column(Integer, default=0)
+    reorder_level: Mapped[int] = mapped_column(Integer, default=0)
+    reorder_quantity: Mapped[int] = mapped_column(Integer, default=0)
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

@@ -24,6 +24,8 @@ class ProductCreate(BaseModel):
     name: str
     warehouse_id: int
     quantity_on_hand: int = 0
+    reorder_level: int = Field(default=0, ge=0)
+    reorder_quantity: int = Field(default=0, ge=0)
 
 
 class ProductOut(BaseModel):
@@ -31,6 +33,8 @@ class ProductOut(BaseModel):
     sku: str
     name: str
     quantity_on_hand: int
+    reorder_level: int
+    reorder_quantity: int
     warehouse_id: int
     created_at: datetime
 
@@ -88,3 +92,15 @@ class StockTransferOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class LowStockAlertOut(BaseModel):
+    product_id: int
+    sku: str
+    name: str
+    warehouse_id: int
+    warehouse_name: str
+    quantity_on_hand: int
+    reorder_level: int
+    reorder_quantity: int
+    suggested_reorder: int

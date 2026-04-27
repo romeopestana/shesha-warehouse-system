@@ -390,3 +390,67 @@ def test_stock_transfer_list_filters_and_roles(client):
     )
     assert by_date.status_code == 200
     assert len(by_date.json()) >= 1
+
+
+def test_low_stock_alerts_with_warehouse_filter(client):
+    admin_headers = _auth_header(client, "admin", "admin123")
+    clerk_headers = _auth_header(client, "clerk", "clerk123")
+
+    wh_1 = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-G", "location": "Durban"},
+        headers=admin_headers,
+    )
+    wh_2 = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-H", "location": "Cape Town"},
+        headers=admin_headers,
+    )
+    assert wh_1.status_code == 200
+    assert wh_2.status_code == 200
+
+    low = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T8-LOW",
+            "name": "Low Stock Product",
+            "warehouse_id": wh_1.json()["id"],
+            "quantity_on_hand": 2,
+            "reorder_level": 5,
+            "reorder_quantity": 20,
+        },
+        headers=admin_headers,
+    )
+    healthy = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T8-OK",
+            "name": "Healthy Product",
+            "warehouse_id": wh_2.json()["id"],
+            "quantity_on_hand": 8,
+            "reorder_level": 5,
+            "reorder_quantity": 10,
+        },
+        headers=admin_headers,
+    )
+    assert low.status_code == 200
+    assert healthy.status_code == 200
+
+    by_admin = client.get("/alerts/low-stock", headers=admin_headers)
+    assert by_admin.status_code == 200
+    rows = by_admin.json()
+    assert len(rows) >= 1
+    assert all(r["quantity_on_hand"] <= r["reorder_level"] for r in rows)
+    low_row = [r for r in rows if r["product_id"] == low.json()["id"]][0]
+    assert low_row["warehouse_id"] == wh_1.json()["id"]
+    assert low_row["suggested_reorder"] == 20
+
+    by_clerk = client.get("/alerts/low-stock", headers=clerk_headers)
+    assert by_clerk.status_code == 200
+
+    filtered = client.get(
+        f"/alerts/low-stock?warehouse_id={wh_1.json()['id']}",
+        headers=admin_headers,
+    )
+    assert filtered.status_code == 200
+    assert all(r["warehouse_id"] == wh_1.json()["id"] for r in filtered.json())

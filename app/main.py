@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.routers import auth, product, stock, transfer, warehouse
+from app.routers import alerts, auth, product, stock, transfer, warehouse
 
 app = FastAPI(title="Shesha Warehouse System API")
 
@@ -9,6 +9,7 @@ app.include_router(warehouse.router)
 app.include_router(product.router)
 app.include_router(stock.router)
 app.include_router(transfer.router)
+app.include_router(alerts.router)
 
 
 @app.get("/health")

@@ -23,6 +23,8 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
         name=payload.name,
         warehouse_id=payload.warehouse_id,
         quantity_on_hand=payload.quantity_on_hand,
+        reorder_level=payload.reorder_level,
+        reorder_quantity=payload.reorder_quantity,
     )
     db.add(product)
     db.flush()
