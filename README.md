@@ -74,6 +74,21 @@ Interactive docs are available at `http://127.0.0.1:8010/docs`.
   - seeds admin user
   - executes API tests (auth, roles, FIFO, and audit filters)
 
+## Scheduled Daily Reorder Scan
+
+- Workflow file:
+  - `.github/workflows/daily-reorder-scan.yml`
+- Trigger options:
+  - daily schedule at `04:00 UTC`
+  - manual trigger via GitHub Actions `workflow_dispatch`
+- Required repository secrets:
+  - `API_BASE_URL` (example: `https://your-api-host`)
+  - `ADMIN_USERNAME`
+  - `ADMIN_PASSWORD`
+- Job action:
+  - obtains JWT from `/auth/token`
+  - calls `POST /jobs/daily-reorder-scan`
+
 ## API Usage Examples
 
 - End-to-end `curl` examples:
