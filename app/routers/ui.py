@@ -252,6 +252,21 @@ def reorder_admin_ui():
   <script>
     let autoRefreshTimer = null;
 
+    function formatLocalDate(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleString(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      });
+    }
+
     function setApiWindow(elId, payload) {
       const el = document.getElementById(elId);
       el.textContent = JSON.stringify(payload, null, 2);
@@ -340,7 +355,9 @@ def reorder_admin_ui():
       return `
         <div class="card">
           <h3>Proposal #${p.id}</h3>
-          <div class="muted">Note: ${p.note || "(none)"} | Created by: ${p.created_by}</div>
+          <div class="muted">
+            Note: ${p.note || "(none)"} | Created by: ${p.created_by} | Created at: ${formatLocalDate(p.created_at)}
+          </div>
           <table>
             <thead>
               <tr>
@@ -393,7 +410,7 @@ def reorder_admin_ui():
             `<div class="card" style="margin-bottom:8px;">
               <div><strong>${n.event_type}</strong> <span class="muted">#${n.id}</span></div>
               <div>${n.message}</div>
-              <div class="muted">${n.created_at}${n.related_id ? ` | related_id=${n.related_id}` : ""}</div>
+              <div class="muted">${formatLocalDate(n.created_at)}${n.related_id ? ` | related_id=${n.related_id}` : ""}</div>
             </div>`
           ).join("");
         }
