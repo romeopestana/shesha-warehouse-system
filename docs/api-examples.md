@@ -125,6 +125,22 @@ curl -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:8010/stock-movements?date_from=2026-04-01T00:00:00&date_to=2026-04-30T23:59:59"
 ```
 
+## 8) Transfer stock between warehouses
+
+Create another product in a different warehouse, then transfer stock:
+
+```bash
+curl -X POST "http://127.0.0.1:8010/stock-transfers" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_product_id": 1,
+    "destination_product_id": 2,
+    "quantity": 10,
+    "note": "Inter-warehouse replenishment"
+  }'
+```
+
 ## OpenAPI client generation
 
 OpenAPI schema URL:

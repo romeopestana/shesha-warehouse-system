@@ -126,3 +126,180 @@ def test_audit_fields_and_filters(client):
     )
     assert by_date.status_code == 200
     assert len(by_date.json()) >= 1
+
+
+def test_stock_transfer_success_and_fifo_effect(client):
+    headers = _auth_header(client, "admin", "admin123")
+
+    wh_a = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-A", "location": "Durban"},
+        headers=headers,
+    )
+    assert wh_a.status_code == 200
+    wh_b = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-B", "location": "Cape Town"},
+        headers=headers,
+    )
+    assert wh_b.status_code == 200
+
+    source = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T5-SRC",
+            "name": "Source Product",
+            "warehouse_id": wh_a.json()["id"],
+            "quantity_on_hand": 0,
+        },
+        headers=headers,
+    )
+    assert source.status_code == 200
+    destination = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T5-DST",
+            "name": "Destination Product",
+            "warehouse_id": wh_b.json()["id"],
+            "quantity_on_hand": 0,
+        },
+        headers=headers,
+    )
+    assert destination.status_code == 200
+
+    source_id = source.json()["id"]
+    destination_id = destination.json()["id"]
+
+    assert (
+        client.post(
+            "/stock-movements",
+            json={"product_id": source_id, "movement_type": "IN", "quantity": 3, "note": "lot1"},
+            headers=headers,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            "/stock-movements",
+            json={"product_id": source_id, "movement_type": "IN", "quantity": 5, "note": "lot2"},
+            headers=headers,
+        ).status_code
+        == 200
+    )
+
+    transfer = client.post(
+        "/stock-transfers",
+        json={
+            "source_product_id": source_id,
+            "destination_product_id": destination_id,
+            "quantity": 4,
+            "note": "inter-warehouse",
+        },
+        headers=headers,
+    )
+    assert transfer.status_code == 200
+    payload = transfer.json()
+    assert payload["performed_by"] == "admin"
+    assert payload["source_product_id"] == source_id
+    assert payload["destination_product_id"] == destination_id
+
+    products = client.get("/products", headers=headers).json()
+    source_row = [p for p in products if p["id"] == source_id][0]
+    destination_row = [p for p in products if p["id"] == destination_id][0]
+    assert source_row["quantity_on_hand"] == 4
+    assert destination_row["quantity_on_hand"] == 4
+
+    source_lots = client.get(f"/products/{source_id}/lots", headers=headers).json()
+    assert source_lots[0]["quantity_remaining"] == 0
+    assert source_lots[1]["quantity_remaining"] == 4
+
+    destination_lots = client.get(f"/products/{destination_id}/lots", headers=headers).json()
+    assert destination_lots[0]["quantity_remaining"] == 4
+
+
+def test_stock_transfer_validations(client):
+    admin_headers = _auth_header(client, "admin", "admin123")
+    clerk_headers = _auth_header(client, "clerk", "clerk123")
+
+    wh_a = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-C", "location": "Durban"},
+        headers=admin_headers,
+    )
+    wh_b = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-D", "location": "Johannesburg"},
+        headers=admin_headers,
+    )
+    assert wh_a.status_code == 200
+    assert wh_b.status_code == 200
+
+    p_same_wh_1 = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T6-A",
+            "name": "Same WH 1",
+            "warehouse_id": wh_a.json()["id"],
+            "quantity_on_hand": 10,
+        },
+        headers=admin_headers,
+    )
+    p_same_wh_2 = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T6-B",
+            "name": "Same WH 2",
+            "warehouse_id": wh_a.json()["id"],
+            "quantity_on_hand": 0,
+        },
+        headers=admin_headers,
+    )
+    p_other_wh = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T6-C",
+            "name": "Other WH",
+            "warehouse_id": wh_b.json()["id"],
+            "quantity_on_hand": 0,
+        },
+        headers=admin_headers,
+    )
+    assert p_same_wh_1.status_code == 200
+    assert p_same_wh_2.status_code == 200
+    assert p_other_wh.status_code == 200
+
+    clerk_forbidden = client.post(
+        "/stock-transfers",
+        json={
+            "source_product_id": p_same_wh_1.json()["id"],
+            "destination_product_id": p_other_wh.json()["id"],
+            "quantity": 1,
+            "note": "clerk should fail",
+        },
+        headers=clerk_headers,
+    )
+    assert clerk_forbidden.status_code == 403
+
+    same_warehouse = client.post(
+        "/stock-transfers",
+        json={
+            "source_product_id": p_same_wh_1.json()["id"],
+            "destination_product_id": p_same_wh_2.json()["id"],
+            "quantity": 1,
+            "note": "same warehouse should fail",
+        },
+        headers=admin_headers,
+    )
+    assert same_warehouse.status_code == 400
+
+    insufficient = client.post(
+        "/stock-transfers",
+        json={
+            "source_product_id": p_same_wh_1.json()["id"],
+            "destination_product_id": p_other_wh.json()["id"],
+            "quantity": 999,
+            "note": "too much",
+        },
+        headers=admin_headers,
+    )
+    assert insufficient.status_code == 400

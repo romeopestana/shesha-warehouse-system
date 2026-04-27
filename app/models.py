@@ -57,6 +57,20 @@ class StockMovement(Base):
     product: Mapped["Product"] = relationship(back_populates="stock_movements")
 
 
+class StockTransfer(Base):
+    __tablename__ = "stock_transfers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    source_product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
+    destination_product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
+    source_warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"), nullable=False)
+    destination_warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    note: Mapped[str] = mapped_column(String(255), default="")
+    performed_by: Mapped[str] = mapped_column(String(120), default="system")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class AppUser(Base):
     __tablename__ = "users"
 
