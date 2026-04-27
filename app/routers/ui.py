@@ -10,7 +10,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import AppUser, NotificationEvent, ReorderProposal
 from app.routers.reorder import approve_reorder_proposal, reject_reorder_proposal
-from app.schemas import ReorderProposalApproveRequest, ReorderProposalRejectRequest
+from app.schemas import ReorderProposalApproveRequest, ReorderProposalOut, ReorderProposalRejectRequest
 
 router = APIRouter(tags=["ui"])
 SESSION_COOKIE_NAME = "admin_session"
@@ -86,7 +86,7 @@ def admin_ui_me(current_user: User = Depends(_require_admin_ui)):
     return {"username": current_user.username, "role": current_user.role}
 
 
-@router.get("/admin/api/reorders/proposals")
+@router.get("/admin/api/reorders/proposals", response_model=list[ReorderProposalOut])
 def admin_ui_list_proposals(
     status: str | None = Query(default="pending"),
     db: Session = Depends(get_db),
@@ -323,7 +323,8 @@ def reorder_admin_ui():
     }
 
     function proposalHtml(p) {
-      const rows = p.items.map((item) => {
+      const items = Array.isArray(p.items) ? p.items : [];
+      const rows = items.map((item) => {
         return `
           <tr>
             <td>${item.id}</td>
@@ -355,7 +356,7 @@ def reorder_admin_ui():
           </table>
           <div style="margin-top: 10px;">
             <label><input type="checkbox" id="force-${p.id}" /> Use force=true (stock-level drift only)</label>
-            <button onclick="approveProposal(${p.id}, ${encodeURIComponent(JSON.stringify(p.items))})">Approve</button>
+            <button onclick="approveProposal(${p.id}, ${encodeURIComponent(JSON.stringify(items))})">Approve</button>
             <button onclick="rejectProposal(${p.id})">Reject</button>
             <span id="status-${p.id}" class="muted"></span>
           </div>
