@@ -82,7 +82,14 @@ Notes:
 - `POST /notifications/{id}/read` (admin/clerk)
 - `POST /jobs/daily-reorder-scan` (admin, idempotent per day/warehouse)
 - `GET /admin/reorders` (lightweight admin UI for proposal review/approve/reject)
-  - uses admin-only session login via `/admin/session/login`
+  - uses admin-only session login
+  - `POST /admin/session/login`
+  - `POST /admin/session/logout`
+  - `GET /admin/session/me`
+  - `GET /admin/api/reorders/proposals` (admin UI data source)
+  - `POST /admin/api/reorders/proposals/{proposal_id}/approve` (admin UI approve action)
+  - `POST /admin/api/reorders/proposals/{proposal_id}/reject` (admin UI reject action)
+  - `GET /admin/api/notifications` (admin UI activity feed)
   - includes activity feed and optional 30s auto-refresh
 
 Interactive docs are available at `http://127.0.0.1:8010/docs`.
@@ -118,6 +125,8 @@ Interactive docs are available at `http://127.0.0.1:8010/docs`.
 
 - End-to-end `curl` examples:
   - `docs/api-examples.md`
+- Release process checklist:
+  - `RELEASE_CHECKLIST.md`
 - Windows smoke test script:
   - `scripts/smoke_test.ps1`
   - run with: `.\scripts\smoke_test.ps1`
