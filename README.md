@@ -83,6 +83,7 @@ Notes:
 - `POST /jobs/daily-reorder-scan` (admin, idempotent per day/warehouse)
 - `GET /admin/reorders` (lightweight admin UI for proposal review/approve/reject)
   - uses admin-only session login via `/admin/session/login`
+  - includes activity feed and optional 30s auto-refresh
 
 Interactive docs are available at `http://127.0.0.1:8010/docs`.
 

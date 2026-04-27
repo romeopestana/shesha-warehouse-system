@@ -1032,3 +1032,6 @@ def test_admin_reorder_ui_session_guards(client):
 
     authed = client.get("/admin/api/reorders/proposals?status=pending")
     assert authed.status_code == 200
+
+    activity = client.get("/admin/api/notifications")
+    assert activity.status_code == 200

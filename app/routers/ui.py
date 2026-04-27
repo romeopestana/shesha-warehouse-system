@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth import User, authenticate_user
 from app.config import settings
 from app.database import get_db
-from app.models import AppUser, ReorderProposal
+from app.models import AppUser, NotificationEvent, ReorderProposal
 from app.routers.reorder import approve_reorder_proposal, reject_reorder_proposal
 from app.schemas import ReorderProposalApproveRequest, ReorderProposalRejectRequest
 
@@ -130,6 +130,27 @@ def admin_ui_reject(
     )
 
 
+@router.get("/admin/api/notifications")
+def admin_ui_notifications(
+    unread_only: bool = Query(default=False),
+    event_type: str | None = Query(default=None),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: User = Depends(_require_admin_ui),
+):
+    query = db.query(NotificationEvent)
+    if unread_only:
+        query = query.filter(NotificationEvent.is_read == 0)
+    if event_type:
+        query = query.filter(NotificationEvent.event_type == event_type)
+    if date_from:
+        query = query.filter(NotificationEvent.created_at >= date_from)
+    if date_to:
+        query = query.filter(NotificationEvent.created_at <= date_to)
+    return query.order_by(NotificationEvent.id.desc()).limit(50).all()
+
+
 @router.get("/admin/reorders", response_class=HTMLResponse)
 def reorder_admin_ui():
     return """
@@ -181,8 +202,28 @@ def reorder_admin_ui():
   <div class="card">
     <h2>Pending Proposals</h2>
     <button onclick="loadPending()">Refresh Pending</button>
+    <label style="display:inline-block; margin-left: 10px;">
+      <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()" /> Auto-refresh every 30s
+    </label>
     <span id="loadStatus" class="muted"></span>
+    <div id="lastUpdated" class="muted" style="margin-top: 6px;">Last updated: never</div>
     <div id="proposalList" style="margin-top: 12px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Activity</h2>
+    <div class="row">
+      <div class="field">
+        <label for="activityEventType">Event type filter</label>
+        <input id="activityEventType" placeholder="e.g. reorder_proposal_approved" />
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button onclick="loadActivity()">Refresh Activity</button>
+      </div>
+    </div>
+    <div id="activityStatus" class="muted"></div>
+    <div id="activityList" style="margin-top: 10px;"></div>
   </div>
 
   <div class="card">
@@ -209,6 +250,8 @@ def reorder_admin_ui():
   </div>
 
   <script>
+    let autoRefreshTimer = null;
+
     function setApiWindow(elId, payload) {
       const el = document.getElementById(elId);
       el.textContent = JSON.stringify(payload, null, 2);
@@ -218,6 +261,25 @@ def reorder_admin_ui():
       const el = document.getElementById(elId);
       el.className = cssClass || "muted";
       el.textContent = text;
+    }
+
+    function setLastUpdated() {
+      const now = new Date().toLocaleString();
+      document.getElementById("lastUpdated").textContent = "Last updated: " + now;
+    }
+
+    function toggleAutoRefresh() {
+      const on = document.getElementById("autoRefreshToggle").checked;
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+      }
+      if (on) {
+        autoRefreshTimer = setInterval(async () => {
+          await loadPending();
+          await loadActivity();
+        }, 30000);
+      }
     }
 
     async function api(path, options = {}) {
@@ -311,8 +373,32 @@ def reorder_admin_ui():
           container.innerHTML = proposals.map(proposalHtml).join("");
         }
         setStatus("loadStatus", "Loaded " + proposals.length + " pending proposal(s).", "ok");
+        setLastUpdated();
       } catch (err) {
         setStatus("loadStatus", "Load failed: " + err.message, "err");
+      }
+    }
+
+    async function loadActivity() {
+      try {
+        const eventType = document.getElementById("activityEventType").value.trim();
+        const qs = eventType ? `?event_type=${encodeURIComponent(eventType)}` : "";
+        const rows = await api(`/admin/api/notifications${qs}`);
+        const list = document.getElementById("activityList");
+        if (!rows.length) {
+          list.innerHTML = '<div class="muted">No activity found.</div>';
+        } else {
+          list.innerHTML = rows.map((n) =>
+            `<div class="card" style="margin-bottom:8px;">
+              <div><strong>${n.event_type}</strong> <span class="muted">#${n.id}</span></div>
+              <div>${n.message}</div>
+              <div class="muted">${n.created_at}${n.related_id ? ` | related_id=${n.related_id}` : ""}</div>
+            </div>`
+          ).join("");
+        }
+        setStatus("activityStatus", "Loaded " + rows.length + " activity item(s).", "ok");
+      } catch (err) {
+        setStatus("activityStatus", "Activity load failed: " + err.message, "err");
       }
     }
 
@@ -373,6 +459,7 @@ def reorder_admin_ui():
         const who = await api("/admin/session/me", { apiWindowId: "api-session-me" });
         setStatus("authStatus", "Active session as " + who.username, "ok");
         await loadPending();
+        await loadActivity();
       } catch (_) {
         setStatus("authStatus", "Not logged in", "muted");
       }
