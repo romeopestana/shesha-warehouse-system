@@ -28,6 +28,7 @@ jobs:
       JWT_SECRET_KEY: test-secret
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Checkout
