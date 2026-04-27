@@ -26,6 +26,25 @@ FastAPI + PostgreSQL starter for the Shesha Warehouse System project.
 6. Run API:
    - `uvicorn app.main:app --reload --port 8010`
 
+## Deploy to Render
+
+1. Push latest `main` to GitHub.
+2. In Render, choose **New +** -> **Blueprint**.
+3. Select this repository; Render will detect `render.yaml`.
+4. Confirm resources:
+   - web service: `shesha-warehouse-api`
+   - postgres database: `shesha-warehouse-db`
+5. Deploy the Blueprint.
+6. After deploy completes:
+   - open `<your-render-url>/health`
+   - open `<your-render-url>/docs`
+7. Use your deployed base URL as GitHub secret:
+   - `API_BASE_URL=https://<your-render-url>`
+
+Notes:
+- Startup runs migrations and seeds admin user automatically via `scripts/render_start.sh`.
+- Default admin remains `admin` / `admin123` until you change it.
+
 ## Authentication
 
 - `POST /auth/token` (OAuth2 password flow)
