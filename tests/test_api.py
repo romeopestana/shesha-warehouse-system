@@ -1003,3 +1003,32 @@ def test_daily_reorder_scan_requires_manual_approval(client):
     movements = client.get(f"/stock-movements?product_id={product_id}", headers=admin_headers)
     assert movements.status_code == 200
     assert all("DAILY_SCAN_AUTO_APPROVED" not in m["note"] for m in movements.json())
+
+
+def test_admin_reorder_ui_session_guards(client):
+    page = client.get("/admin/reorders")
+    assert page.status_code == 200
+    assert "Reorder Proposal Admin" in page.text
+
+    unauth = client.get("/admin/api/reorders/proposals?status=pending")
+    assert unauth.status_code == 401
+
+    clerk_login = client.post(
+        "/admin/session/login",
+        data={"username": "clerk", "password": "clerk123"},
+    )
+    assert clerk_login.status_code == 403
+
+    admin_login = client.post(
+        "/admin/session/login",
+        data={"username": "admin", "password": "admin123"},
+    )
+    assert admin_login.status_code == 200
+    assert admin_login.json()["role"] == "admin"
+
+    session_check = client.get("/admin/session/me")
+    assert session_check.status_code == 200
+    assert session_check.json()["role"] == "admin"
+
+    authed = client.get("/admin/api/reorders/proposals?status=pending")
+    assert authed.status_code == 200

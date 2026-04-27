@@ -82,6 +82,7 @@ Notes:
 - `POST /notifications/{id}/read` (admin/clerk)
 - `POST /jobs/daily-reorder-scan` (admin, idempotent per day/warehouse)
 - `GET /admin/reorders` (lightweight admin UI for proposal review/approve/reject)
+  - uses admin-only session login via `/admin/session/login`
 
 Interactive docs are available at `http://127.0.0.1:8010/docs`.
 

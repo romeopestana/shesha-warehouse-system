@@ -1,7 +1,133 @@
-from fastapi import APIRouter
+from typing import Annotated
+
+from fastapi import APIRouter, Cookie, Depends, Form, HTTPException, Query, Request, Response, status
 from fastapi.responses import HTMLResponse
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+
+from app.auth import User, authenticate_user
+from app.config import settings
+from app.database import get_db
+from app.models import AppUser, ReorderProposal
+from app.routers.reorder import approve_reorder_proposal, reject_reorder_proposal
+from app.schemas import ReorderProposalApproveRequest, ReorderProposalRejectRequest
 
 router = APIRouter(tags=["ui"])
+SESSION_COOKIE_NAME = "admin_session"
+
+
+def _user_from_session_cookie(
+    session_token: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
+    db: Session = Depends(get_db),
+) -> User:
+    if not session_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    try:
+        payload = jwt.decode(
+            session_token,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
+        )
+        username = payload.get("sub")
+        role = payload.get("role")
+        if username is None or role is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
+    except JWTError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session") from exc
+    user = db.query(AppUser).filter(AppUser.username == username).first()
+    if user is None or bool(user.disabled):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
+    return User(username=user.username, role=user.role, disabled=bool(user.disabled))
+
+
+def _require_admin_ui(user: User = Depends(_user_from_session_cookie)) -> User:
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
+    return user
+
+
+@router.post("/admin/session/login")
+def admin_ui_login(
+    request: Request,
+    response: Response,
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = authenticate_user(db, username, password)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
+    token = jwt.encode(
+        {"sub": user.username, "role": user.role},
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+        max_age=settings.access_token_expire_minutes * 60,
+    )
+    return {"username": user.username, "role": user.role}
+
+
+@router.post("/admin/session/logout")
+def admin_ui_logout(response: Response):
+    response.delete_cookie(key=SESSION_COOKIE_NAME)
+    return {"ok": True}
+
+
+@router.get("/admin/session/me")
+def admin_ui_me(current_user: User = Depends(_require_admin_ui)):
+    return {"username": current_user.username, "role": current_user.role}
+
+
+@router.get("/admin/api/reorders/proposals")
+def admin_ui_list_proposals(
+    status: str | None = Query(default="pending"),
+    db: Session = Depends(get_db),
+    _: User = Depends(_require_admin_ui),
+):
+    query = db.query(ReorderProposal)
+    if status is not None:
+        query = query.filter(ReorderProposal.status == status)
+    return query.order_by(ReorderProposal.id.desc()).all()
+
+
+@router.post("/admin/api/reorders/proposals/{proposal_id}/approve")
+def admin_ui_approve(
+    proposal_id: int,
+    payload: ReorderProposalApproveRequest,
+    force: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_require_admin_ui),
+):
+    return approve_reorder_proposal(
+        proposal_id=proposal_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,
+        force=force,
+    )
+
+
+@router.post("/admin/api/reorders/proposals/{proposal_id}/reject")
+def admin_ui_reject(
+    proposal_id: int,
+    payload: ReorderProposalRejectRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_require_admin_ui),
+):
+    return reject_reorder_proposal(
+        proposal_id=proposal_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,
+    )
 
 
 @router.get("/admin/reorders", response_class=HTMLResponse)
@@ -60,8 +186,6 @@ def reorder_admin_ui():
   </div>
 
   <script>
-    let accessToken = "";
-
     function setStatus(elId, text, cssClass) {
       const el = document.getElementById(elId);
       el.className = cssClass || "muted";
@@ -70,9 +194,8 @@ def reorder_admin_ui():
 
     async function api(path, options = {}) {
       const headers = options.headers || {};
-      if (accessToken) headers["Authorization"] = "Bearer " + accessToken;
       if (!headers["Content-Type"] && options.body) headers["Content-Type"] = "application/json";
-      const resp = await fetch(path, { ...options, headers });
+      const resp = await fetch(path, { ...options, headers, credentials: "include" });
       const text = await resp.text();
       let data = {};
       try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { raw: text }; }
@@ -87,16 +210,16 @@ def reorder_admin_ui():
       const password = document.getElementById("password").value;
       const body = new URLSearchParams({ username, password });
       try {
-        const resp = await fetch("/auth/token", {
+        const resp = await fetch("/admin/session/login", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: body.toString()
+          body: body.toString(),
+          credentials: "include"
         });
         const data = await resp.json();
         if (!resp.ok) {
           throw new Error(data.detail || "Login failed");
         }
-        accessToken = data.access_token;
         setStatus("authStatus", "Logged in as " + username, "ok");
         await loadPending();
       } catch (err) {
@@ -146,12 +269,8 @@ def reorder_admin_ui():
     }
 
     async function loadPending() {
-      if (!accessToken) {
-        setStatus("loadStatus", "Please log in first.", "err");
-        return;
-      }
       try {
-        const proposals = await api("/reorders/proposals?status=pending");
+        const proposals = await api("/admin/api/reorders/proposals?status=pending");
         const container = document.getElementById("proposalList");
         if (!proposals.length) {
           container.innerHTML = '<div class="muted">No pending proposals.</div>';
@@ -178,12 +297,16 @@ def reorder_admin_ui():
       }
       const force = document.getElementById(`force-${proposalId}`).checked;
       const path = force
-        ? `/reorders/proposals/${proposalId}/approve?force=true`
-        : `/reorders/proposals/${proposalId}/approve`;
+        ? `/admin/api/reorders/proposals/${proposalId}/approve?force=true`
+        : `/admin/api/reorders/proposals/${proposalId}/approve`;
+      const summary = item_quantities.map((x) => `item ${x.item_id}: ${x.quantity_added}`).join(", ");
+      if (!confirm(`Approve proposal #${proposalId} with quantities: ${summary}?`)) return;
       try {
         const payload = await api(path, { method: "POST", body: JSON.stringify({ item_quantities }) });
         const blocked = payload.blocked ? payload.blocked.length : 0;
-        setStatus(`status-${proposalId}`, `Approved. Applied: ${payload.applied.length}, blocked: ${blocked}`, "ok");
+        const blockedReasons = (payload.blocked || []).map((b) => `item ${b.item_id}: ${b.reason}`).join("; ");
+        const suffix = blockedReasons ? ` | ${blockedReasons}` : "";
+        setStatus(`status-${proposalId}`, `Approved. Applied: ${payload.applied.length}, blocked: ${blocked}${suffix}`, "ok");
         await loadPending();
       } catch (err) {
         setStatus(`status-${proposalId}`, "Approve failed: " + err.message, "err");
@@ -194,7 +317,7 @@ def reorder_admin_ui():
       const reason = prompt("Rejection reason:");
       if (!reason) return;
       try {
-        await api(`/reorders/proposals/${proposalId}/reject`, {
+        await api(`/admin/api/reorders/proposals/${proposalId}/reject`, {
           method: "POST",
           body: JSON.stringify({ reason })
         });
@@ -204,6 +327,16 @@ def reorder_admin_ui():
         setStatus(`status-${proposalId}`, "Reject failed: " + err.message, "err");
       }
     }
+
+    window.addEventListener("load", async () => {
+      try {
+        const who = await api("/admin/session/me");
+        setStatus("authStatus", "Active session as " + who.username, "ok");
+        await loadPending();
+      } catch (_) {
+        setStatus("authStatus", "Not logged in", "muted");
+      }
+    });
   </script>
 </body>
 </html>
