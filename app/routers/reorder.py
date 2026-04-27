@@ -7,6 +7,9 @@ from app.auth import User, require_roles
 from app.database import get_db
 from app.models import InventoryLot, Product, ReorderProposal, ReorderProposalItem, StockMovement
 from app.schemas import (
+    ReorderApprovalAppliedItem,
+    ReorderApprovalBlockedItem,
+    ReorderProposalApprovalResult,
     ReorderProposalOut,
     ReorderProposalRejectRequest,
     SuggestedReorderCreate,
@@ -118,11 +121,12 @@ def list_reorder_proposals(
     return query.order_by(ReorderProposal.id.desc()).all()
 
 
-@router.post("/proposals/{proposal_id}/approve", response_model=ReorderProposalOut)
+@router.post("/proposals/{proposal_id}/approve", response_model=ReorderProposalApprovalResult)
 def approve_reorder_proposal(
     proposal_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin")),
+    force: bool = Query(default=False),
 ):
     proposal = db.query(ReorderProposal).filter(ReorderProposal.id == proposal_id).first()
     if not proposal:
@@ -136,13 +140,39 @@ def approve_reorder_proposal(
         .order_by(ReorderProposalItem.id.asc())
         .all()
     )
+    applied: list[ReorderApprovalAppliedItem] = []
+    blocked: list[ReorderApprovalBlockedItem] = []
+
     for item in items:
         product = db.query(Product).filter(Product.id == item.product_id).first()
         if not product:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Product {item.product_id} no longer exists",
+            blocked.append(
+                ReorderApprovalBlockedItem(
+                    item_id=item.id,
+                    product_id=item.product_id,
+                    reason="product no longer exists",
+                )
             )
+            continue
+        if product.warehouse_id != item.warehouse_id:
+            blocked.append(
+                ReorderApprovalBlockedItem(
+                    item_id=item.id,
+                    product_id=item.product_id,
+                    reason="product warehouse changed since proposal",
+                )
+            )
+            continue
+        if not force and product.quantity_on_hand > product.reorder_level:
+            blocked.append(
+                ReorderApprovalBlockedItem(
+                    item_id=item.id,
+                    product_id=item.product_id,
+                    reason="product is no longer low-stock",
+                )
+            )
+            continue
+
         product.quantity_on_hand += item.quantity_added
         db.add(
             InventoryLot(
@@ -160,6 +190,19 @@ def approve_reorder_proposal(
             )
         )
         db.add(product)
+        applied.append(
+            ReorderApprovalAppliedItem(
+                item_id=item.id,
+                product_id=item.product_id,
+                quantity_added=item.quantity_added,
+            )
+        )
+
+    if not applied and blocked:
+        raise HTTPException(
+            status_code=400,
+            detail="No proposal items can be approved due to drift; use force=true to override stock-level drift only.",
+        )
 
     proposal.status = "approved"
     proposal.reviewed_by = current_user.username
@@ -167,7 +210,7 @@ def approve_reorder_proposal(
     db.add(proposal)
     db.commit()
     db.refresh(proposal)
-    return proposal
+    return ReorderProposalApprovalResult(proposal=proposal, applied=applied, blocked=blocked)
 
 
 @router.post("/proposals/{proposal_id}/reject", response_model=ReorderProposalOut)

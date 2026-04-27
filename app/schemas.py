@@ -162,3 +162,21 @@ class ReorderProposalOut(BaseModel):
 
 class ReorderProposalRejectRequest(BaseModel):
     reason: str = Field(min_length=1)
+
+
+class ReorderApprovalBlockedItem(BaseModel):
+    item_id: int
+    product_id: int
+    reason: str
+
+
+class ReorderApprovalAppliedItem(BaseModel):
+    item_id: int
+    product_id: int
+    quantity_added: int
+
+
+class ReorderProposalApprovalResult(BaseModel):
+    proposal: ReorderProposalOut
+    applied: list[ReorderApprovalAppliedItem]
+    blocked: list[ReorderApprovalBlockedItem]

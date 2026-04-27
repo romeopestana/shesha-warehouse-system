@@ -672,7 +672,7 @@ def test_reorder_proposal_approve_and_reject_flow(client):
         headers=admin_headers,
     )
     assert approved.status_code == 200
-    assert approved.json()["status"] == "approved"
+    assert approved.json()["proposal"]["status"] == "approved"
 
     products_after_approve = client.get("/products", headers=admin_headers).json()
     approved_row = [p for p in products_after_approve if p["id"] == p_approve.json()["id"]][0]
@@ -707,3 +707,128 @@ def test_reorder_proposal_approve_and_reject_flow(client):
         headers=admin_headers,
     )
     assert reject_then_approve.status_code == 400
+
+
+def test_reorder_proposal_drift_checks_and_force_override(client):
+    admin_headers = _auth_header(client, "admin", "admin123")
+
+    wh_a = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-L", "location": "Durban"},
+        headers=admin_headers,
+    )
+    assert wh_a.status_code == 200
+
+    p_drift = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T12-DRIFT",
+            "name": "Drift Product",
+            "warehouse_id": wh_a.json()["id"],
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 4,
+        },
+        headers=admin_headers,
+    )
+    p_force = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T12-FORCE",
+            "name": "Force Product",
+            "warehouse_id": wh_a.json()["id"],
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 3,
+        },
+        headers=admin_headers,
+    )
+    assert p_drift.status_code == 200
+    assert p_force.status_code == 200
+
+    proposal = client.post(
+        "/reorders/suggested",
+        json={
+            "warehouse_id": wh_a.json()["id"],
+            "product_ids": [p_drift.json()["id"], p_force.json()["id"]],
+            "dry_run": True,
+            "note": "DRIFT CHECK",
+        },
+        headers=admin_headers,
+    )
+    assert proposal.status_code == 200
+    proposal_id = proposal.json()["proposal_id"]
+    assert proposal_id is not None
+
+    # product still exists but no longer low stock -> blocked unless force=true
+    restock_force_product = client.post(
+        "/stock-movements",
+        json={
+            "product_id": p_force.json()["id"],
+            "movement_type": "IN",
+            "quantity": 20,
+            "note": "manual restock before approval",
+        },
+        headers=admin_headers,
+    )
+    assert restock_force_product.status_code == 200
+
+    without_force = client.post(
+        f"/reorders/proposals/{proposal_id}/approve",
+        headers=admin_headers,
+    )
+    assert without_force.status_code == 200
+    result = without_force.json()
+    assert result["proposal"]["status"] == "approved"
+    assert len(result["applied"]) == 1
+    assert len(result["blocked"]) == 1
+    assert result["blocked"][0]["reason"] == "product is no longer low-stock"
+
+    p_force_only = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T12-FORCE-ONLY",
+            "name": "Force Only Product",
+            "warehouse_id": wh_a.json()["id"],
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 2,
+        },
+        headers=admin_headers,
+    )
+    assert p_force_only.status_code == 200
+
+    proposal_force = client.post(
+        "/reorders/suggested",
+        json={
+            "warehouse_id": wh_a.json()["id"],
+            "product_ids": [p_force_only.json()["id"]],
+            "dry_run": True,
+            "note": "FORCE OVERRIDE",
+        },
+        headers=admin_headers,
+    )
+    assert proposal_force.status_code == 200
+    proposal_force_id = proposal_force.json()["proposal_id"]
+    assert proposal_force_id is not None
+
+    lift_stock = client.post(
+        "/stock-movements",
+        json={
+            "product_id": p_force_only.json()["id"],
+            "movement_type": "IN",
+            "quantity": 10,
+            "note": "lift above reorder level",
+        },
+        headers=admin_headers,
+    )
+    assert lift_stock.status_code == 200
+
+    with_force = client.post(
+        f"/reorders/proposals/{proposal_force_id}/approve?force=true",
+        headers=admin_headers,
+    )
+    assert with_force.status_code == 200
+    forced_payload = with_force.json()
+    assert len(forced_payload["applied"]) == 1
+    assert len(forced_payload["blocked"]) == 0

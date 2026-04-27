@@ -230,6 +230,15 @@ curl -X POST "http://127.0.0.1:8010/reorders/proposals/1/approve" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
+Approve with force override (only bypasses low-stock drift):
+
+```bash
+curl -X POST "http://127.0.0.1:8010/reorders/proposals/1/approve?force=true" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Approval responses include `applied` and `blocked` item arrays with drift reasons.
+
 Reject proposal:
 
 ```bash
