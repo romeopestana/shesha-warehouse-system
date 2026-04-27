@@ -29,10 +29,10 @@ FastAPI + PostgreSQL starter for the Shesha Warehouse System project.
 ## Authentication
 
 - `POST /auth/token` (OAuth2 password flow)
-- Demo users:
-  - `admin` / `admin123` (role: `admin`)
-  - `clerk` / `clerk123` (role: `clerk`)
-- These credentials are in-memory demo data for scaffolding only.
+- Users are now loaded from the database.
+- Seed initial admin user:
+  - `python -m scripts.seed_admin_user`
+  - default credentials: `admin` / `admin123`
 - Protected stock endpoints:
   - `POST /stock-movements` requires `admin`
   - `GET /stock-movements` requires `admin` or `clerk`
