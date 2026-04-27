@@ -81,6 +81,7 @@ Notes:
 - `GET /notifications` (admin/clerk, supports `unread_only`, `event_type`, `date_from`, `date_to`)
 - `POST /notifications/{id}/read` (admin/clerk)
 - `POST /jobs/daily-reorder-scan` (admin, idempotent per day/warehouse)
+- `GET /admin/reorders` (lightweight admin UI for proposal review/approve/reject)
 
 Interactive docs are available at `http://127.0.0.1:8010/docs`.
 
