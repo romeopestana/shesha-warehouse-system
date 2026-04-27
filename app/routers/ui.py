@@ -185,7 +185,35 @@ def reorder_admin_ui():
     <div id="proposalList" style="margin-top: 12px;"></div>
   </div>
 
+  <div class="card">
+    <h2>API Response Windows</h2>
+    <p class="muted">Live payloads from UI API calls for easier troubleshooting and auditing.</p>
+    <div class="row">
+      <div class="field" style="flex: 1 1 420px;">
+        <label>GET /admin/session/me</label>
+        <pre id="api-session-me" style="min-height: 120px; background: #111; color: #f1f1f1; padding: 10px; border-radius: 6px; overflow:auto;">(no response yet)</pre>
+      </div>
+      <div class="field" style="flex: 1 1 420px;">
+        <label>GET /admin/api/reorders/proposals?status=pending</label>
+        <pre id="api-proposals" style="min-height: 120px; background: #111; color: #f1f1f1; padding: 10px; border-radius: 6px; overflow:auto;">(no response yet)</pre>
+      </div>
+      <div class="field" style="flex: 1 1 420px;">
+        <label>POST /admin/api/reorders/proposals/{id}/approve</label>
+        <pre id="api-approve" style="min-height: 120px; background: #111; color: #f1f1f1; padding: 10px; border-radius: 6px; overflow:auto;">(no response yet)</pre>
+      </div>
+      <div class="field" style="flex: 1 1 420px;">
+        <label>POST /admin/api/reorders/proposals/{id}/reject</label>
+        <pre id="api-reject" style="min-height: 120px; background: #111; color: #f1f1f1; padding: 10px; border-radius: 6px; overflow:auto;">(no response yet)</pre>
+      </div>
+    </div>
+  </div>
+
   <script>
+    function setApiWindow(elId, payload) {
+      const el = document.getElementById(elId);
+      el.textContent = JSON.stringify(payload, null, 2);
+    }
+
     function setStatus(elId, text, cssClass) {
       const el = document.getElementById(elId);
       el.className = cssClass || "muted";
@@ -199,6 +227,10 @@ def reorder_admin_ui():
       const text = await resp.text();
       let data = {};
       try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { raw: text }; }
+      const apiWindowId = options.apiWindowId || null;
+      if (apiWindowId) {
+        setApiWindow(apiWindowId, { path, status: resp.status, payload: data });
+      }
       if (!resp.ok) {
         throw new Error(data.detail || JSON.stringify(data));
       }
@@ -220,6 +252,7 @@ def reorder_admin_ui():
         if (!resp.ok) {
           throw new Error(data.detail || "Login failed");
         }
+        setApiWindow("api-session-me", { login: data });
         setStatus("authStatus", "Logged in as " + username, "ok");
         await loadPending();
       } catch (err) {
@@ -270,7 +303,7 @@ def reorder_admin_ui():
 
     async function loadPending() {
       try {
-        const proposals = await api("/admin/api/reorders/proposals?status=pending");
+        const proposals = await api("/admin/api/reorders/proposals?status=pending", { apiWindowId: "api-proposals" });
         const container = document.getElementById("proposalList");
         if (!proposals.length) {
           container.innerHTML = '<div class="muted">No pending proposals.</div>';
@@ -302,13 +335,18 @@ def reorder_admin_ui():
       const summary = item_quantities.map((x) => `item ${x.item_id}: ${x.quantity_added}`).join(", ");
       if (!confirm(`Approve proposal #${proposalId} with quantities: ${summary}?`)) return;
       try {
-        const payload = await api(path, { method: "POST", body: JSON.stringify({ item_quantities }) });
+        const payload = await api(path, {
+          method: "POST",
+          body: JSON.stringify({ item_quantities }),
+          apiWindowId: "api-approve",
+        });
         const blocked = payload.blocked ? payload.blocked.length : 0;
         const blockedReasons = (payload.blocked || []).map((b) => `item ${b.item_id}: ${b.reason}`).join("; ");
         const suffix = blockedReasons ? ` | ${blockedReasons}` : "";
         setStatus(`status-${proposalId}`, `Approved. Applied: ${payload.applied.length}, blocked: ${blocked}${suffix}`, "ok");
         await loadPending();
       } catch (err) {
+        setApiWindow("api-approve", { error: err.message, proposalId, force, item_quantities });
         setStatus(`status-${proposalId}`, "Approve failed: " + err.message, "err");
       }
     }
@@ -317,20 +355,22 @@ def reorder_admin_ui():
       const reason = prompt("Rejection reason:");
       if (!reason) return;
       try {
-        await api(`/admin/api/reorders/proposals/${proposalId}/reject`, {
+        const payload = await api(`/admin/api/reorders/proposals/${proposalId}/reject`, {
           method: "POST",
-          body: JSON.stringify({ reason })
+          body: JSON.stringify({ reason }),
+          apiWindowId: "api-reject",
         });
         setStatus(`status-${proposalId}`, "Rejected.", "ok");
         await loadPending();
       } catch (err) {
+        setApiWindow("api-reject", { error: err.message, proposalId, reason });
         setStatus(`status-${proposalId}`, "Reject failed: " + err.message, "err");
       }
     }
 
     window.addEventListener("load", async () => {
       try {
-        const who = await api("/admin/session/me");
+        const who = await api("/admin/session/me", { apiWindowId: "api-session-me" });
         setStatus("authStatus", "Active session as " + who.username, "ok");
         await loadPending();
       } catch (_) {
