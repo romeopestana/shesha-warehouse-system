@@ -104,3 +104,27 @@ class LowStockAlertOut(BaseModel):
     reorder_level: int
     reorder_quantity: int
     suggested_reorder: int
+
+
+class SuggestedReorderCreate(BaseModel):
+    warehouse_id: int | None = None
+    product_ids: list[int] | None = None
+    note: str = "Automated reorder from low-stock alerts"
+
+
+class SuggestedReorderCreatedItem(BaseModel):
+    product_id: int
+    quantity_added: int
+    quantity_before: int
+    quantity_after: int
+    warehouse_id: int
+
+
+class SuggestedReorderSkippedItem(BaseModel):
+    product_id: int
+    reason: str
+
+
+class SuggestedReorderResult(BaseModel):
+    created: list[SuggestedReorderCreatedItem]
+    skipped: list[SuggestedReorderSkippedItem]

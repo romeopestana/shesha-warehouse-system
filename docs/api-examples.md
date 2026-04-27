@@ -186,6 +186,23 @@ curl -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:8010/alerts/low-stock?warehouse_id=1"
 ```
 
+## 10) Create suggested reorders from alerts
+
+Bulk restock low-stock items (admin only):
+
+```bash
+curl -X POST "http://127.0.0.1:8010/reorders/suggested" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "warehouse_id": 1,
+    "product_ids": [1, 2, 3],
+    "note": "Daily replenishment run"
+  }'
+```
+
+Response includes `created` and `skipped` arrays.
+
 ## OpenAPI client generation
 
 OpenAPI schema URL:

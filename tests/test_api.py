@@ -454,3 +454,92 @@ def test_low_stock_alerts_with_warehouse_filter(client):
     )
     assert filtered.status_code == 200
     assert all(r["warehouse_id"] == wh_1.json()["id"] for r in filtered.json())
+
+
+def test_suggested_reorders_create_and_skip(client):
+    admin_headers = _auth_header(client, "admin", "admin123")
+    clerk_headers = _auth_header(client, "clerk", "clerk123")
+
+    wh = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-I", "location": "Bloemfontein"},
+        headers=admin_headers,
+    )
+    assert wh.status_code == 200
+    wh_id = wh.json()["id"]
+
+    low_with_reorder = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T9-LOW-OK",
+            "name": "Low With Reorder",
+            "warehouse_id": wh_id,
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 10,
+        },
+        headers=admin_headers,
+    )
+    low_zero_reorder = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T9-LOW-SKIP",
+            "name": "Low Zero Reorder",
+            "warehouse_id": wh_id,
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 0,
+        },
+        headers=admin_headers,
+    )
+    healthy = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T9-HEALTHY",
+            "name": "Healthy",
+            "warehouse_id": wh_id,
+            "quantity_on_hand": 9,
+            "reorder_level": 5,
+            "reorder_quantity": 10,
+        },
+        headers=admin_headers,
+    )
+    assert low_with_reorder.status_code == 200
+    assert low_zero_reorder.status_code == 200
+    assert healthy.status_code == 200
+
+    forbidden = client.post(
+        "/reorders/suggested",
+        json={"warehouse_id": wh_id},
+        headers=clerk_headers,
+    )
+    assert forbidden.status_code == 403
+
+    result = client.post(
+        "/reorders/suggested",
+        json={
+            "warehouse_id": wh_id,
+            "product_ids": [
+                low_with_reorder.json()["id"],
+                low_zero_reorder.json()["id"],
+                healthy.json()["id"],
+            ],
+            "note": "AUTO TEST REORDER",
+        },
+        headers=admin_headers,
+    )
+    assert result.status_code == 200
+    payload = result.json()
+    assert len(payload["created"]) == 1
+    assert payload["created"][0]["product_id"] == low_with_reorder.json()["id"]
+    assert payload["created"][0]["quantity_before"] == 1
+    assert payload["created"][0]["quantity_after"] == 11
+    assert len(payload["skipped"]) == 1
+    assert payload["skipped"][0]["product_id"] == low_zero_reorder.json()["id"]
+
+    movements = client.get(
+        f"/stock-movements?product_id={low_with_reorder.json()['id']}",
+        headers=admin_headers,
+    )
+    assert movements.status_code == 200
+    assert any(m["note"] == "AUTO TEST REORDER" for m in movements.json())
