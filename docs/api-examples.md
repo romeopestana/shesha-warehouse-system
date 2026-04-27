@@ -141,6 +141,20 @@ curl -X POST "http://127.0.0.1:8010/stock-transfers" \
   }'
 ```
 
+List transfers:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8010/stock-transfers"
+```
+
+Filter transfers:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8010/stock-transfers?source_warehouse_id=1&destination_warehouse_id=2&date_from=2026-04-01T00:00:00&date_to=2026-04-30T23:59:59"
+```
+
 ## OpenAPI client generation
 
 OpenAPI schema URL:

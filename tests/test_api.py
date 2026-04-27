@@ -303,3 +303,90 @@ def test_stock_transfer_validations(client):
         headers=admin_headers,
     )
     assert insufficient.status_code == 400
+
+
+def test_stock_transfer_list_filters_and_roles(client):
+    admin_headers = _auth_header(client, "admin", "admin123")
+    clerk_headers = _auth_header(client, "clerk", "clerk123")
+
+    wh_a = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-E", "location": "Pretoria"},
+        headers=admin_headers,
+    )
+    wh_b = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-F", "location": "Port Elizabeth"},
+        headers=admin_headers,
+    )
+    assert wh_a.status_code == 200
+    assert wh_b.status_code == 200
+
+    source = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T7-SRC",
+            "name": "Filter Source",
+            "warehouse_id": wh_a.json()["id"],
+            "quantity_on_hand": 10,
+        },
+        headers=admin_headers,
+    )
+    destination = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T7-DST",
+            "name": "Filter Destination",
+            "warehouse_id": wh_b.json()["id"],
+            "quantity_on_hand": 0,
+        },
+        headers=admin_headers,
+    )
+    assert source.status_code == 200
+    assert destination.status_code == 200
+
+    created = client.post(
+        "/stock-transfers",
+        json={
+            "source_product_id": source.json()["id"],
+            "destination_product_id": destination.json()["id"],
+            "quantity": 2,
+            "note": "filterable transfer",
+        },
+        headers=admin_headers,
+    )
+    assert created.status_code == 200
+
+    admin_list = client.get("/stock-transfers", headers=admin_headers)
+    assert admin_list.status_code == 200
+    assert len(admin_list.json()) >= 1
+
+    clerk_list = client.get("/stock-transfers", headers=clerk_headers)
+    assert clerk_list.status_code == 200
+    assert len(clerk_list.json()) >= 1
+
+    by_source = client.get(
+        f"/stock-transfers?source_warehouse_id={wh_a.json()['id']}",
+        headers=admin_headers,
+    )
+    assert by_source.status_code == 200
+    assert all(t["source_warehouse_id"] == wh_a.json()["id"] for t in by_source.json())
+
+    by_destination = client.get(
+        f"/stock-transfers?destination_warehouse_id={wh_b.json()['id']}",
+        headers=admin_headers,
+    )
+    assert by_destination.status_code == 200
+    assert all(
+        t["destination_warehouse_id"] == wh_b.json()["id"] for t in by_destination.json()
+    )
+
+    now = datetime.utcnow()
+    start = (now - timedelta(minutes=1)).isoformat()
+    end = (now + timedelta(minutes=1)).isoformat()
+    by_date = client.get(
+        f"/stock-transfers?date_from={start}&date_to={end}",
+        headers=admin_headers,
+    )
+    assert by_date.status_code == 200
+    assert len(by_date.json()) >= 1

@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.auth import User, require_roles
@@ -112,3 +114,26 @@ def create_stock_transfer(
     db.commit()
     db.refresh(transfer)
     return transfer
+
+
+@router.get("", response_model=list[StockTransferOut])
+def list_stock_transfers(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "clerk")),
+    source_warehouse_id: int | None = Query(default=None),
+    destination_warehouse_id: int | None = Query(default=None),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+):
+    query = db.query(StockTransfer)
+
+    if source_warehouse_id is not None:
+        query = query.filter(StockTransfer.source_warehouse_id == source_warehouse_id)
+    if destination_warehouse_id is not None:
+        query = query.filter(StockTransfer.destination_warehouse_id == destination_warehouse_id)
+    if date_from is not None:
+        query = query.filter(StockTransfer.created_at >= date_from)
+    if date_to is not None:
+        query = query.filter(StockTransfer.created_at <= date_to)
+
+    return query.order_by(StockTransfer.id.desc()).all()
