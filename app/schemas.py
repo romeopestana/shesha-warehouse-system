@@ -110,6 +110,7 @@ class SuggestedReorderCreate(BaseModel):
     warehouse_id: int | None = None
     product_ids: list[int] | None = None
     note: str = "Automated reorder from low-stock alerts"
+    dry_run: bool = False
 
 
 class SuggestedReorderCreatedItem(BaseModel):

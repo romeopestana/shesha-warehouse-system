@@ -543,3 +543,56 @@ def test_suggested_reorders_create_and_skip(client):
     )
     assert movements.status_code == 200
     assert any(m["note"] == "AUTO TEST REORDER" for m in movements.json())
+
+
+def test_suggested_reorders_dry_run_no_persistence(client):
+    admin_headers = _auth_header(client, "admin", "admin123")
+
+    wh = client.post(
+        "/warehouses",
+        json={"name": "Warehouse-J", "location": "Polokwane"},
+        headers=admin_headers,
+    )
+    assert wh.status_code == 200
+    wh_id = wh.json()["id"]
+
+    product = client.post(
+        "/products",
+        json={
+            "sku": "SKU-T10-DRY",
+            "name": "Dry Run Product",
+            "warehouse_id": wh_id,
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 7,
+        },
+        headers=admin_headers,
+    )
+    assert product.status_code == 200
+    product_id = product.json()["id"]
+
+    preview = client.post(
+        "/reorders/suggested",
+        json={
+            "warehouse_id": wh_id,
+            "product_ids": [product_id],
+            "note": "DRY RUN",
+            "dry_run": True,
+        },
+        headers=admin_headers,
+    )
+    assert preview.status_code == 200
+    payload = preview.json()
+    assert len(payload["created"]) == 1
+    assert payload["created"][0]["product_id"] == product_id
+    assert payload["created"][0]["quantity_before"] == 1
+    assert payload["created"][0]["quantity_after"] == 8
+
+    products = client.get("/products", headers=admin_headers)
+    assert products.status_code == 200
+    row = [p for p in products.json() if p["id"] == product_id][0]
+    assert row["quantity_on_hand"] == 1
+
+    movements = client.get(f"/stock-movements?product_id={product_id}", headers=admin_headers)
+    assert movements.status_code == 200
+    assert all(m["note"] != "DRY RUN" for m in movements.json())

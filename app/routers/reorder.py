@@ -42,32 +42,37 @@ def create_suggested_reorders(
             continue
 
         before = product.quantity_on_hand
-        product.quantity_on_hand += product.reorder_quantity
-        db.add(
-            InventoryLot(
-                product_id=product.id,
-                quantity_remaining=product.reorder_quantity,
+        after = product.quantity_on_hand + product.reorder_quantity
+        if not payload.dry_run:
+            product.quantity_on_hand = after
+            db.add(
+                InventoryLot(
+                    product_id=product.id,
+                    quantity_remaining=product.reorder_quantity,
+                )
             )
-        )
-        db.add(
-            StockMovement(
-                product_id=product.id,
-                movement_type="IN",
-                quantity=product.reorder_quantity,
-                note=payload.note,
-                performed_by=current_user.username,
+            db.add(
+                StockMovement(
+                    product_id=product.id,
+                    movement_type="IN",
+                    quantity=product.reorder_quantity,
+                    note=payload.note,
+                    performed_by=current_user.username,
+                )
             )
-        )
-        db.add(product)
+            db.add(product)
         created.append(
             SuggestedReorderCreatedItem(
                 product_id=product.id,
                 quantity_added=product.reorder_quantity,
                 quantity_before=before,
-                quantity_after=product.quantity_on_hand,
+                quantity_after=after,
                 warehouse_id=product.warehouse_id,
             )
         )
 
-    db.commit()
+    if not payload.dry_run:
+        db.commit()
+    else:
+        db.rollback()
     return SuggestedReorderResult(created=created, skipped=skipped)

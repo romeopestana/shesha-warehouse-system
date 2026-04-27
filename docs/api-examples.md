@@ -203,6 +203,19 @@ curl -X POST "http://127.0.0.1:8010/reorders/suggested" \
 
 Response includes `created` and `skipped` arrays.
 
+Preview without writing changes:
+
+```bash
+curl -X POST "http://127.0.0.1:8010/reorders/suggested" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "warehouse_id": 1,
+    "dry_run": true,
+    "note": "Preview only"
+  }'
+```
+
 ## OpenAPI client generation
 
 OpenAPI schema URL:
