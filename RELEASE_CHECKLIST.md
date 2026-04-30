@@ -30,13 +30,12 @@ Use this checklist for every change before promoting to production.
   - `python -m uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload`
 - Verify key routes:
   - `http://127.0.0.1:8010/docs`
-  - `http://127.0.0.1:8010/admin/reorders`
+  - `http://127.0.0.1:8010/alerts/low-stock`
 - Run a quick happy path:
   - login
   - create warehouse/product
-  - create pending proposal
-  - approve/reject proposal
-  - verify notifications/activity
+  - create stock movement(s)
+  - verify low-stock alerts and notifications
 
 ## 5) Version Control
 
@@ -57,12 +56,11 @@ Use this checklist for every change before promoting to production.
 - Verify:
   - `/health`
   - `/docs`
-  - `/admin/reorders`
+  - `/alerts/low-stock`
 - Run a minimal operational flow and confirm expected behavior.
 
 ## 8) Post-Deploy Checks
 
 - Confirm no unexpected errors in logs.
-- Confirm scheduled job/workflow health (if applicable).
-- Confirm notifications and proposal flows are functioning.
+- Confirm notifications and low-stock alert flows are functioning.
 

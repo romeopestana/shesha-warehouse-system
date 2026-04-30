@@ -73,24 +73,8 @@ Notes:
 - `POST /stock-transfers` (admin-only warehouse-to-warehouse transfers)
 - `GET /stock-transfers` (admin/clerk, supports `source_warehouse_id`, `destination_warehouse_id`, `date_from`, `date_to`)
 - `GET /alerts/low-stock` (admin/clerk, optional `warehouse_id` filter)
-- `POST /reorders/suggested` (admin-only bulk restock from low-stock alerts)
-  - supports `dry_run` preview mode
-- `GET /reorders/proposals` (admin/clerk, optional `status` filter)
-- `POST /reorders/proposals/{id}/approve` (admin, supports `force=true`; requires user-specified `item_quantities`)
-- `POST /reorders/proposals/{id}/reject` (admin)
 - `GET /notifications` (admin/clerk, supports `unread_only`, `event_type`, `date_from`, `date_to`)
 - `POST /notifications/{id}/read` (admin/clerk)
-- `POST /jobs/daily-reorder-scan` (admin, idempotent per day/warehouse)
-- `GET /admin/reorders` (lightweight admin UI for proposal review/approve/reject)
-  - uses admin-only session login
-  - `POST /admin/session/login`
-  - `POST /admin/session/logout`
-  - `GET /admin/session/me`
-  - `GET /admin/api/reorders/proposals` (admin UI data source)
-  - `POST /admin/api/reorders/proposals/{proposal_id}/approve` (admin UI approve action)
-  - `POST /admin/api/reorders/proposals/{proposal_id}/reject` (admin UI reject action)
-  - `GET /admin/api/notifications` (admin UI activity feed)
-  - includes activity feed and optional 30s auto-refresh
 
 Interactive docs are available at `http://127.0.0.1:8010/docs`.
 
@@ -103,23 +87,10 @@ Interactive docs are available at `http://127.0.0.1:8010/docs`.
   - seeds admin user
   - executes API tests (auth, roles, FIFO, and audit filters)
 
-## Scheduled Daily Reorder Scan
+## Low-Stock Policy
 
-- Workflow file:
-  - `.github/workflows/daily-reorder-scan.yml`
-- Trigger options:
-  - daily schedule at `04:00 UTC`
-  - manual trigger via GitHub Actions `workflow_dispatch`
-- Required repository secrets:
-  - `API_BASE_URL` (example: `https://your-api-host`)
-  - `ADMIN_USERNAME`
-  - `ADMIN_PASSWORD`
-- Job action:
-  - obtains JWT from `/auth/token`
-  - calls `POST /jobs/daily-reorder-scan`
-- Approval policy:
-  - all reorder proposals remain `pending` until an admin explicitly approves
-  - no automatic approvals are performed by daily scan or suggestion endpoints
+- The system alerts when stock is low through `GET /alerts/low-stock`.
+- Re-ordering is handled outside this system; there are no in-app reorder proposal or approval endpoints.
 
 ## API Usage Examples
 

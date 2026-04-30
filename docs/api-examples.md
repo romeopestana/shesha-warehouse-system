@@ -186,84 +186,7 @@ curl -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:8010/alerts/low-stock?warehouse_id=1"
 ```
 
-## 10) Create suggested reorders from alerts
-
-Bulk restock low-stock items (admin only):
-
-```bash
-curl -X POST "http://127.0.0.1:8010/reorders/suggested" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "warehouse_id": 1,
-    "product_ids": [1, 2, 3],
-    "note": "Daily replenishment run"
-  }'
-```
-
-Response includes `created` and `skipped` arrays.
-
-Preview without writing changes:
-
-```bash
-curl -X POST "http://127.0.0.1:8010/reorders/suggested" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "warehouse_id": 1,
-    "dry_run": true,
-    "note": "Preview only"
-  }'
-```
-
-List proposals:
-
-```bash
-curl -H "Authorization: Bearer $TOKEN" \
-  "http://127.0.0.1:8010/reorders/proposals?status=pending"
-```
-
-Approve proposal:
-
-```bash
-curl -X POST "http://127.0.0.1:8010/reorders/proposals/1/approve" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "item_quantities": [
-      { "item_id": 10, "quantity_added": 25 },
-      { "item_id": 11, "quantity_added": 12 }
-    ]
-  }'
-```
-
-Approve with force override (only bypasses low-stock drift):
-
-```bash
-curl -X POST "http://127.0.0.1:8010/reorders/proposals/1/approve?force=true" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "item_quantities": [
-      { "item_id": 10, "quantity_added": 25 }
-    ]
-  }'
-```
-
-Approval responses include `applied` and `blocked` item arrays with drift reasons.
-
-Reject proposal:
-
-```bash
-curl -X POST "http://127.0.0.1:8010/reorders/proposals/2/reject" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "reason": "Budget hold"
-  }'
-```
-
-## 11) Notifications
+## 10) Notifications
 
 List unread notifications:
 
@@ -276,7 +199,7 @@ Filter notifications by event type:
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" \
-  "http://127.0.0.1:8010/notifications?event_type=reorder_proposal_approved"
+  "http://127.0.0.1:8010/notifications?event_type=low_stock_observed"
 ```
 
 Mark notification as read:
@@ -285,18 +208,6 @@ Mark notification as read:
 curl -X POST "http://127.0.0.1:8010/notifications/1/read" \
   -H "Authorization: Bearer $TOKEN"
 ```
-
-## 12) Daily reorder scan job
-
-Trigger daily scan (creates dry-run proposals per low-stock warehouse):
-
-```bash
-curl -X POST "http://127.0.0.1:8010/jobs/daily-reorder-scan" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Re-running the job on the same day skips warehouses already scanned.
-Response includes pending proposal IDs only; approvals are always manual.
 
 ## OpenAPI client generation
 
