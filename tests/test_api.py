@@ -236,3 +236,68 @@ def test_notifications_emission_and_read_flow(client):
     mark_read = client.post(f"/notifications/{first_id}/read", headers=clerk_headers)
     assert mark_read.status_code == 200
     assert mark_read.json()["is_read"] == 1
+
+
+def test_low_stock_summary_endpoint(client):
+    admin_headers = _auth_header(client)
+
+    wh_a = client.post(
+        "/warehouses",
+        json={"name": "Summary Warehouse A", "location": "Vienna"},
+        headers=admin_headers,
+    )
+    wh_b = client.post(
+        "/warehouses",
+        json={"name": "Summary Warehouse B", "location": "Graz"},
+        headers=admin_headers,
+    )
+    assert wh_a.status_code == 200
+    assert wh_b.status_code == 200
+
+    low_a = client.post(
+        "/products",
+        json={
+            "sku": "SUMMARY-LOW-A",
+            "name": "Summary Low A",
+            "warehouse_id": wh_a.json()["id"],
+            "quantity_on_hand": 1,
+            "reorder_level": 5,
+            "reorder_quantity": 10,
+        },
+        headers=admin_headers,
+    )
+    low_b = client.post(
+        "/products",
+        json={
+            "sku": "SUMMARY-LOW-B",
+            "name": "Summary Low B",
+            "warehouse_id": wh_b.json()["id"],
+            "quantity_on_hand": 0,
+            "reorder_level": 3,
+            "reorder_quantity": 6,
+        },
+        headers=admin_headers,
+    )
+    healthy = client.post(
+        "/products",
+        json={
+            "sku": "SUMMARY-OK",
+            "name": "Summary Healthy",
+            "warehouse_id": wh_b.json()["id"],
+            "quantity_on_hand": 10,
+            "reorder_level": 3,
+            "reorder_quantity": 6,
+        },
+        headers=admin_headers,
+    )
+    assert low_a.status_code == 200
+    assert low_b.status_code == 200
+    assert healthy.status_code == 200
+
+    summary = client.get("/alerts/summary", headers=admin_headers)
+    assert summary.status_code == 200
+    payload = summary.json()
+    assert payload["total_low_stock_items"] == 2
+    assert len(payload["warehouse_breakdown"]) == 2
+    assert any(row["warehouse_id"] == wh_a.json()["id"] and row["low_stock_count"] == 1 for row in payload["warehouse_breakdown"])
+    assert any(row["warehouse_id"] == wh_b.json()["id"] and row["low_stock_count"] == 1 for row in payload["warehouse_breakdown"])

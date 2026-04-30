@@ -73,6 +73,7 @@ Notes:
 - `POST /stock-transfers` (admin-only warehouse-to-warehouse transfers)
 - `GET /stock-transfers` (admin/clerk, supports `source_warehouse_id`, `destination_warehouse_id`, `date_from`, `date_to`)
 - `GET /alerts/low-stock` (admin/clerk, optional `warehouse_id` filter)
+- `GET /alerts/summary` (admin/clerk, low-stock totals and per-warehouse breakdown)
 - `GET /notifications` (admin/clerk, supports `unread_only`, `event_type`, `date_from`, `date_to`)
 - `POST /notifications/{id}/read` (admin/clerk)
 
@@ -101,6 +102,9 @@ Interactive docs are available at `http://127.0.0.1:8010/docs`.
 - Windows smoke test script:
   - `scripts/smoke_test.ps1`
   - run with: `.\scripts\smoke_test.ps1`
+- Alerts-only smoke test script:
+  - `scripts/smoke_test_alerts.ps1`
+  - run with: `.\scripts\smoke_test_alerts.ps1`
 - Windows role guard smoke test:
   - `scripts/smoke_test_roles.ps1`
   - run with: `.\scripts\smoke_test_roles.ps1`

@@ -101,6 +101,17 @@ class LowStockAlertOut(BaseModel):
     suggested_reorder: int
 
 
+class LowStockWarehouseSummary(BaseModel):
+    warehouse_id: int
+    warehouse_name: str
+    low_stock_count: int
+
+
+class LowStockSummaryOut(BaseModel):
+    total_low_stock_items: int
+    warehouse_breakdown: list[LowStockWarehouseSummary]
+
+
 class SuggestedReorderCreate(BaseModel):
     warehouse_id: int | None = None
     product_ids: list[int] | None = None

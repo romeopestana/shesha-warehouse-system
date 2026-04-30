@@ -186,6 +186,13 @@ curl -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:8010/alerts/low-stock?warehouse_id=1"
 ```
 
+Summary of low-stock counts by warehouse:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8010/alerts/summary"
+```
+
 ## 10) Notifications
 
 List unread notifications:
