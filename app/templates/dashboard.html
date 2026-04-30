@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shesha Warehouse Dashboard</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --ink: #1e293b;
+      --muted: #64748b;
+      --brand-a: #1e3a5f;
+      --brand-b: #2d4a73;
+      --brand-c: #1e3a5f;
+      --ok: #0f766e;
+      --danger: #b91c1c;
+      --line: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .hero {
+      position: relative;
+      height: 96px;
+      overflow: hidden;
+      background: #111827;
+      border-bottom: 3px solid var(--brand-a);
+    }
+    .hero img.cover {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.85;
+    }
+    .hero .brand {
+      position: absolute;
+      left: 24px;
+      bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 10px;
+    }
+    .hero .brand img {
+      width: 46px;
+      height: 46px;
+      object-fit: contain;
+    }
+    .hero .brand .title {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    .hero .brand .sub {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .hero .actions {
+      position: absolute;
+      right: 16px;
+      bottom: 10px;
+      display: none;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: 62%;
+    }
+    .hero .actions.visible { display: flex; }
+    .hero .actions .countdown {
+      margin: 0;
+      color: #334155;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 24px auto;
+      padding: 0 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .sidebar {
+      width: 300px;
+      min-width: 300px;
+      display: none;
+      position: sticky;
+      top: 14px;
+    }
+    .sidebar.visible { display: block; }
+    .content { flex: 1; display: grid; gap: 16px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+    .requires-auth { display: none; }
+    .requires-auth.visible { display: block; }
+    .settings-toggle {
+      margin-top: 8px;
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+    .settings-section {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+    .settings-section h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .metric {
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+    }
+    .metric .k {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--brand-a);
+    }
+    .metric .t {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    h2 { margin: 4px 0 12px; }
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    input, select, button {
+      font-size: 14px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+    }
+    input, select { min-width: 220px; }
+    button {
+      cursor: pointer;
+      background: var(--brand-a);
+      color: #fff;
+      border: none;
+      font-weight: 600;
+      transition: background 0.2s ease;
+    }
+    button:hover {
+      background: var(--brand-b);
+    }
+    button.alt {
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      font-weight: 500;
+    }
+    button.alt:hover {
+      background: #f8fafc;
+    }
+    .status { font-size: 13px; color: var(--muted); }
+    .ok { color: var(--ok); }
+    .err { color: var(--danger); }
+    .countdown {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .login-footer {
+      margin-top: 32px;
+      padding: 24px 0;
+      border-top: 1px solid var(--line);
+      text-align: center;
+      color: #64748b;
+      font-size: 14px;
+    }
+    .login-footer img {
+      height: 32px;
+      width: auto;
+      object-fit: contain;
+      margin-bottom: 0;
+    }
+    .login-footer .inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .login-footer .powered {
+      font-size: 12px;
+      color: #475569;
+    }
+    .login-footer .copyright {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      padding: 10px 6px;
+      font-size: 14px;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .footer-note { color: var(--muted); font-size: 12px; }
+    @media (max-width: 900px) {
+      .grid-3 { grid-template-columns: 1fr; }
+      .wrap { flex-direction: column; }
+      .sidebar { width: 100%; min-width: 100%; position: static; }
+      .hero { height: 108px; }
+      .hero .actions {
+        position: static;
+        margin: 8px 12px 0;
+        max-width: 100%;
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <img class="cover" src="/static/images/shesha-header.png" alt="Shesha header" />
+    <div class="brand">
+      <img src="/static/images/shesha-logo.png" alt="Shesha logo" />
+      <div>
+        <div class="title">Shesha Warehouse Dashboard</div>
+          <div class="sub">Inventory Management System</div>
+      </div>
+    </div>
+    <div id="headerActions" class="actions">
+      <button class="alt" onclick="refreshData()">Refresh</button>
+      <button class="alt" onclick="logoutUser('Manual logout')">Logout</button>
+      <p id="refreshCountdown" class="countdown">Auto-refresh every 05:00 (login required)</p>
+      <p id="logoutCountdown" class="countdown">Auto-logout in 02:00 after inactivity</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <aside id="settingsSidebar" class="sidebar">
+      <section class="card">
+        <h2>Settings</h2>
+        <button id="settingsToggleBtn" class="settings-toggle" onclick="toggleSettingsBody()">Collapse</button>
+        <div id="settingsBody">
+          <div class="settings-section">
+            <h3>Change Admin Password</h3>
+            <input id="adminCurrentPassword" type="password" placeholder="Current password" />
+            <input id="adminNewPassword" type="password" placeholder="New password" />
+            <button onclick="changeAdminPassword()">Update Password</button>
+          </div>
+
+          <div class="settings-section">
+            <h3>Change Refresh Time</h3>
+            <input id="refreshMinutes" type="number" min="1" value="5" />
+            <button onclick="applyRefreshMinutes()">Apply</button>
+          </div>
+
+          <div class="settings-section">
+            <h3>Auto Logout Time</h3>
+            <input id="autoLogoutMinutes" type="number" min="1" value="2" />
+            <button onclick="applyAutoLogoutMinutes()">Apply</button>
+          </div>
+
+          <div class="settings-section">
+            <h3>Manage Clerk</h3>
+            <h3>1. Create Clerk</h3>
+            <input id="newClerkUsername" placeholder="Clerk username" />
+            <input id="newClerkPassword" type="password" placeholder="Clerk password" />
+            <button onclick="createClerk()">Create Clerk</button>
+
+            <h3 style="margin-top:12px;">2. Block Clerk</h3>
+            <select id="clerkSelectBlock"></select>
+            <button onclick="blockClerk()">Block Clerk</button>
+
+            <h3 style="margin-top:12px;">3. Remove Clerk</h3>
+            <select id="clerkSelectRemove"></select>
+            <button onclick="removeClerk()">Remove Clerk</button>
+
+            <h3 style="margin-top:12px;">4. Reset Clerk Password</h3>
+            <select id="clerkSelectReset"></select>
+            <input id="clerkResetPassword" type="password" placeholder="New clerk password" />
+            <button onclick="resetClerkPassword()">Reset Password</button>
+          </div>
+        </div>
+        <p id="settingsStatus" class="status">Admin settings ready.</p>
+      </section>
+    </aside>
+
+    <div class="content">
+    <section id="signInCard" class="card">
+      <h2>Sign In</h2>
+      <div class="row">
+        <select id="username">
+          <option value="admin">admin</option>
+          <option value="clerk">clerk</option>
+        </select>
+        <input id="password" type="password" placeholder="Password" />
+        <button onclick="login()">Login</button>
+      </div>
+      <p id="authStatus" class="status">Not authenticated</p>
+    </section>
+
+    <section id="summaryCard" class="card requires-auth">
+      <h2>Low-Stock Summary</h2>
+      <div class="grid-3">
+        <div class="metric">
+          <div id="mTotal" class="k">0</div>
+          <div class="t">Total Low-Stock Items</div>
+        </div>
+        <div class="metric">
+          <div id="mWarehouses" class="k">0</div>
+          <div class="t">Warehouses with Low Stock</div>
+        </div>
+        <div class="metric">
+          <div id="mUpdated" class="k" style="font-size:18px;">--</div>
+          <div class="t">Last Updated</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="breakdownCard" class="card requires-auth">
+      <h2>Breakdown by Warehouse</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Warehouse</th>
+            <th>Low-Stock Count</th>
+          </tr>
+        </thead>
+        <tbody id="summaryRows">
+          <tr><td colspan="2" class="status">No data loaded.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="itemsCard" class="card requires-auth">
+      <h2>Low-Stock Items</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Name</th>
+            <th>Warehouse</th>
+            <th>On Hand</th>
+            <th>Reorder Level</th>
+          </tr>
+        </thead>
+        <tbody id="alertRows">
+          <tr><td colspan="5" class="status">No data loaded.</td></tr>
+        </tbody>
+      </table>
+      <p class="footer-note">Alerts-only mode: in-app reordering is intentionally disabled.</p>
+    </section>
+    </div>
+  </main>
+  <footer class="login-footer">
+    <div class="inner">
+      <img src="/static/images/redfiniti-logo.png" alt="Redfiniti logo" />
+      <div class="powered">This site is powered by Redfiniti</div>
+    </div>
+    <div class="copyright">© 2026 Shesha Logistics. All Rights Reserved.</div>
+  </footer>
+
+  <script>
+    let token = "";
+    let currentRole = "";
+    let refreshTimer = null;
+    let refreshSecondsRemaining = 300;
+    let refreshSecondsDefault = 300;
+    let inactivityTimer = null;
+    let inactivityKickTimer = null;
+    let inactivitySecondsRemaining = 120;
+    let inactivitySecondsDefault = 120;
+    let settingsCollapsed = false;
+
+    function formatCountdown(totalSeconds) {
+      const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+      const s = (totalSeconds % 60).toString().padStart(2, "0");
+      return `${m}:${s}`;
+    }
+
+    function updateCountdownLabel() {
+      const el = document.getElementById("refreshCountdown");
+      if (!token) {
+        const base = formatCountdown(refreshSecondsDefault);
+        el.textContent = `Auto-refresh every ${base} (login required)`;
+        return;
+      }
+      el.textContent = `Auto-refresh in ${formatCountdown(refreshSecondsRemaining)}`;
+    }
+    function updateLogoutLabel() {
+      const el = document.getElementById("logoutCountdown");
+      if (!token) {
+        el.textContent = `Auto-logout in ${formatCountdown(inactivitySecondsDefault)} after inactivity`;
+        return;
+      }
+      el.textContent = `Auto-logout in ${formatCountdown(inactivitySecondsRemaining)} after inactivity`;
+    }
+
+    function stopAutoRefresh() {
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+    }
+
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      refreshSecondsRemaining = refreshSecondsDefault;
+      updateCountdownLabel();
+      refreshTimer = setInterval(async () => {
+        refreshSecondsRemaining -= 1;
+        if (refreshSecondsRemaining <= 0) {
+          await refreshData();
+          refreshSecondsRemaining = refreshSecondsDefault;
+        }
+        updateCountdownLabel();
+      }, 1000);
+    }
+    function stopAutoLogout() {
+      if (inactivityTimer) {
+        clearInterval(inactivityTimer);
+        inactivityTimer = null;
+      }
+      if (inactivityKickTimer) {
+        clearTimeout(inactivityKickTimer);
+        inactivityKickTimer = null;
+      }
+    }
+    function resetInactivityKickTimer() {
+      if (inactivityKickTimer) {
+        clearTimeout(inactivityKickTimer);
+      }
+      inactivityKickTimer = setTimeout(() => {
+        logoutUser("Auto logged out due to inactivity.");
+      }, inactivitySecondsDefault * 1000);
+    }
+    function markActivity() {
+      if (!token) return;
+      inactivitySecondsRemaining = inactivitySecondsDefault;
+      updateLogoutLabel();
+      resetInactivityKickTimer();
+    }
+    function startAutoLogout() {
+      stopAutoLogout();
+      inactivitySecondsRemaining = inactivitySecondsDefault;
+      updateLogoutLabel();
+      resetInactivityKickTimer();
+      inactivityTimer = setInterval(() => {
+        inactivitySecondsRemaining -= 1;
+        if (inactivitySecondsRemaining <= 0) {
+          inactivitySecondsRemaining = 0;
+        }
+        updateLogoutLabel();
+      }, 1000);
+    }
+    function setSettingsStatus(text, cls) {
+      const el = document.getElementById("settingsStatus");
+      el.textContent = text;
+      el.className = `status ${cls || ""}`.trim();
+    }
+    function toggleSettingsBody() {
+      settingsCollapsed = !settingsCollapsed;
+      document.getElementById("settingsBody").style.display = settingsCollapsed ? "none" : "block";
+      document.getElementById("settingsToggleBtn").textContent = settingsCollapsed ? "Expand" : "Collapse";
+    }
+    function updateAdminSidebarVisibility() {
+      const sidebar = document.getElementById("settingsSidebar");
+      if (token && currentRole === "admin") sidebar.classList.add("visible");
+      else sidebar.classList.remove("visible");
+    }
+    async function loadClerks() {
+      if (!(token && currentRole === "admin")) return;
+      try {
+        const clerks = await api("/admin/users/clerks");
+        const ids = ["clerkSelectBlock", "clerkSelectRemove", "clerkSelectReset"];
+        ids.forEach((id) => {
+          const sel = document.getElementById(id);
+          sel.innerHTML = clerks.length
+            ? clerks.map((c) => `<option value="${c.username}">${c.username}${c.disabled ? " (blocked)" : ""}</option>`).join("")
+            : '<option value="">No clerks</option>';
+        });
+      } catch (err) {
+        setSettingsStatus(`Clerk list unavailable: ${err.message}`, "err");
+      }
+    }
+    async function changeAdminPassword() {
+      try {
+        const current_password = document.getElementById("adminCurrentPassword").value;
+        const new_password = document.getElementById("adminNewPassword").value;
+        await api("/admin/users/admin/change-password", {
+          method: "POST",
+          body: JSON.stringify({ current_password, new_password })
+        });
+        setSettingsStatus("Admin password updated.", "ok");
+      } catch (err) {
+        setSettingsStatus(`Password change failed: ${err.message}`, "err");
+      }
+    }
+    function applyRefreshMinutes() {
+      const mins = Number(document.getElementById("refreshMinutes").value);
+      if (!Number.isInteger(mins) || mins < 1) {
+        setSettingsStatus("Refresh minutes must be at least 1.", "err");
+        return;
+      }
+      refreshSecondsDefault = mins * 60;
+      refreshSecondsRemaining = refreshSecondsDefault;
+      updateCountdownLabel();
+      if (token) startAutoRefresh();
+      setSettingsStatus(`Refresh interval set to ${mins} minute(s).`, "ok");
+    }
+    function applyAutoLogoutMinutes() {
+      const mins = Number(document.getElementById("autoLogoutMinutes").value);
+      if (!Number.isInteger(mins) || mins < 1) {
+        setSettingsStatus("Auto logout minutes must be at least 1.", "err");
+        return;
+      }
+      inactivitySecondsDefault = mins * 60;
+      inactivitySecondsRemaining = inactivitySecondsDefault;
+      updateLogoutLabel();
+      if (token) startAutoLogout();
+      setSettingsStatus(`Auto logout set to ${mins} minute(s).`, "ok");
+    }
+    function logoutUser(reason) {
+      token = "";
+      currentRole = "";
+      setAuthenticatedUI(false);
+      updateAdminSidebarVisibility();
+      stopAutoRefresh();
+      stopAutoLogout();
+      updateCountdownLabel();
+      updateLogoutLabel();
+      setStatus(reason || "Logged out.", "ok");
+      // Ensure we always return to the initial login view state.
+      window.location.href = "/";
+    }
+    async function createClerk() {
+      try {
+        const username = document.getElementById("newClerkUsername").value.trim();
+        const password = document.getElementById("newClerkPassword").value;
+        await api("/admin/users/clerks", { method: "POST", body: JSON.stringify({ username, password }) });
+        await loadClerks();
+        setSettingsStatus(`Clerk '${username}' created.`, "ok");
+      } catch (err) {
+        setSettingsStatus(`Create clerk failed: ${err.message}`, "err");
+      }
+    }
+    async function blockClerk() {
+      const username = document.getElementById("clerkSelectBlock").value;
+      if (!username) return;
+      try {
+        await api(`/admin/users/clerks/${encodeURIComponent(username)}/block`, { method: "POST" });
+        await loadClerks();
+        setSettingsStatus(`Clerk '${username}' blocked.`, "ok");
+      } catch (err) {
+        setSettingsStatus(`Block clerk failed: ${err.message}`, "err");
+      }
+    }
+    async function removeClerk() {
+      const username = document.getElementById("clerkSelectRemove").value;
+      if (!username) return;
+      try {
+        await api(`/admin/users/clerks/${encodeURIComponent(username)}`, { method: "DELETE" });
+        await loadClerks();
+        setSettingsStatus(`Clerk '${username}' removed.`, "ok");
+      } catch (err) {
+        setSettingsStatus(`Remove clerk failed: ${err.message}`, "err");
+      }
+    }
+    async function resetClerkPassword() {
+      const username = document.getElementById("clerkSelectReset").value;
+      const new_password = document.getElementById("clerkResetPassword").value;
+      if (!username) return;
+      try {
+        await api(`/admin/users/clerks/${encodeURIComponent(username)}/reset-password`, {
+          method: "POST",
+          body: JSON.stringify({ new_password }),
+        });
+        setSettingsStatus(`Password reset for '${username}'.`, "ok");
+      } catch (err) {
+        setSettingsStatus(`Reset password failed: ${err.message}`, "err");
+      }
+    }
+    function setStatus(text, cls) {
+      const el = document.getElementById("authStatus");
+      el.textContent = text;
+      el.className = `status ${cls || ""}`.trim();
+    }
+    function setAuthenticatedUI(on) {
+      const ids = ["summaryCard", "breakdownCard", "itemsCard"];
+      ids.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (on) el.classList.add("visible");
+        else el.classList.remove("visible");
+      });
+      const signInCard = document.getElementById("signInCard");
+      if (signInCard) signInCard.style.display = on ? "none" : "block";
+      const headerActions = document.getElementById("headerActions");
+      if (headerActions) {
+        if (on) headerActions.classList.add("visible");
+        else headerActions.classList.remove("visible");
+      }
+    }
+    function stampNow() {
+      document.getElementById("mUpdated").textContent = new Date().toLocaleTimeString();
+    }
+    async function login() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+      try {
+        const body = new URLSearchParams({ username, password });
+        const res = await fetch("/auth/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: body.toString()
+        });
+        const data = await res.json();
+        if (!res.ok || !data.access_token) {
+          throw new Error(data.detail || "Login failed");
+        }
+        token = data.access_token;
+        currentRole = data.role || "";
+        setStatus(`Authenticated as ${username}`, "ok");
+        setAuthenticatedUI(true);
+        updateAdminSidebarVisibility();
+        await refreshData();
+        await loadClerks();
+        startAutoRefresh();
+        startAutoLogout();
+      } catch (err) {
+        token = "";
+        currentRole = "";
+        setStatus(`Login failed: ${err.message}`, "err");
+        setAuthenticatedUI(false);
+        updateAdminSidebarVisibility();
+        stopAutoRefresh();
+        stopAutoLogout();
+        updateCountdownLabel();
+        updateLogoutLabel();
+      }
+    }
+    async function api(path) {
+      const res = await fetch(path, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+      return data;
+    }
+    async function refreshData() {
+      if (!token) {
+        setStatus("Please login first.", "err");
+        setAuthenticatedUI(false);
+        updateCountdownLabel();
+        updateLogoutLabel();
+        return;
+      }
+      try {
+        const [summary, alerts] = await Promise.all([
+          api("/alerts/summary"),
+          api("/alerts/low-stock")
+        ]);
+
+        document.getElementById("mTotal").textContent = summary.total_low_stock_items;
+        document.getElementById("mWarehouses").textContent = summary.warehouse_breakdown.length;
+        stampNow();
+        refreshSecondsRemaining = refreshSecondsDefault;
+        updateCountdownLabel();
+        markActivity();
+
+        const summaryRows = document.getElementById("summaryRows");
+        if (!summary.warehouse_breakdown.length) {
+          summaryRows.innerHTML = '<tr><td colspan="2" class="status">No low-stock warehouses.</td></tr>';
+        } else {
+          summaryRows.innerHTML = summary.warehouse_breakdown.map((row) => `
+            <tr>
+              <td>${row.warehouse_name}</td>
+              <td>${row.low_stock_count}</td>
+            </tr>
+          `).join("");
+        }
+
+        const alertRows = document.getElementById("alertRows");
+        if (!alerts.length) {
+          alertRows.innerHTML = '<tr><td colspan="5" class="status">No low-stock items.</td></tr>';
+        } else {
+          alertRows.innerHTML = alerts.map((item) => `
+            <tr>
+              <td>${item.sku}</td>
+              <td>${item.name}</td>
+              <td>${item.warehouse_name}</td>
+              <td>${item.quantity_on_hand}</td>
+              <td>${item.reorder_level}</td>
+            </tr>
+          `).join("");
+        }
+      } catch (err) {
+        setStatus(`Load failed: ${err.message}`, "err");
+      }
+    }
+
+    ["click", "keydown", "mousemove", "touchstart"].forEach((evt) => {
+      document.addEventListener(evt, () => markActivity(), { passive: true });
+    });
+
+    const passwordInput = document.getElementById("password");
+    if (passwordInput) {
+      passwordInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          login();
+        }
+      });
+    }
+  </script>
+</body>
+</html>

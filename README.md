@@ -76,8 +76,14 @@ Notes:
 - `GET /alerts/summary` (admin/clerk, low-stock totals and per-warehouse breakdown)
 - `GET /notifications` (admin/clerk, supports `unread_only`, `event_type`, `date_from`, `date_to`)
 - `POST /notifications/{id}/read` (admin/clerk)
+- `GET /` (dashboard UI with Shesha branding; login + low-stock views)
+  - admin-only collapsible Settings panel for:
+    - Change Admin Password
+    - Change Refresh Time
+    - Manage Clerk (create, block, remove, reset password)
 
 Interactive docs are available at `http://127.0.0.1:8010/docs`.
+Dashboard UI is available at `http://127.0.0.1:8010/`.
 
 ## Automated Tests
 

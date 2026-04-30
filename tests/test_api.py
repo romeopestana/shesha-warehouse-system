@@ -301,3 +301,48 @@ def test_low_stock_summary_endpoint(client):
     assert len(payload["warehouse_breakdown"]) == 2
     assert any(row["warehouse_id"] == wh_a.json()["id"] and row["low_stock_count"] == 1 for row in payload["warehouse_breakdown"])
     assert any(row["warehouse_id"] == wh_b.json()["id"] and row["low_stock_count"] == 1 for row in payload["warehouse_breakdown"])
+
+
+def test_dashboard_ui_page_serves(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Shesha Warehouse Dashboard" in response.text
+
+
+def test_admin_settings_clerk_management_endpoints(client):
+    admin_headers = _auth_header(client, "admin", "admin123")
+    clerk_headers = _auth_header(client, "clerk", "clerk123")
+
+    # admin can create clerk
+    created = client.post(
+        "/admin/users/clerks",
+        headers=admin_headers,
+        json={"username": "clerk_settings", "password": "clerkpass123"},
+    )
+    assert created.status_code == 200
+
+    # clerk cannot create clerk
+    denied = client.post(
+        "/admin/users/clerks",
+        headers=clerk_headers,
+        json={"username": "not_allowed", "password": "clerkpass123"},
+    )
+    assert denied.status_code == 403
+
+    listed = client.get("/admin/users/clerks", headers=admin_headers)
+    assert listed.status_code == 200
+    assert any(c["username"] == "clerk_settings" for c in listed.json())
+
+    blocked = client.post("/admin/users/clerks/clerk_settings/block", headers=admin_headers)
+    assert blocked.status_code == 200
+    assert blocked.json()["disabled"] == 1
+
+    reset = client.post(
+        "/admin/users/clerks/clerk_settings/reset-password",
+        headers=admin_headers,
+        json={"new_password": "newclerkpass123"},
+    )
+    assert reset.status_code == 200
+
+    removed = client.delete("/admin/users/clerks/clerk_settings", headers=admin_headers)
+    assert removed.status_code == 200

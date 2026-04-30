@@ -9,3 +9,4 @@ alembic
 passlib[argon2]
 pytest
 httpx
+jinja2
